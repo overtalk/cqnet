@@ -6,13 +6,21 @@
 
 namespace cqnet {
 
-auto EVFilterSock = -0xd;
-
 class Poller : public base::Noncopyable
 {
+public:
+    // EVFilterSock represents exceptional events that are not read/write, like socket being closed,
+    // reading/writing from/to a closed socket, etc.
+    static int EVFilterSock;
+    // for wake up
+    static int user_event_ident_;
+    // init_event_size_ represents the initial length of poller event-list.
+    static int init_event_size_;
+    // event_list_resize_increment_ represents the increment of event list vector
+    static int event_list_resize_increment_;
+
 private:
     int kq_fd_;                           // kqueue fd
-    int user_event_ident_;                // for wake up
     base::AsyncJobQueue async_job_queue_; // async job queue
 
 private:
@@ -45,18 +53,18 @@ public:
     bool Polling(Callback& cb)
     {
         bool wake_up = false;
-        std::vector<struct kevent> event_entries; // for receive entry
+        std::vector<struct kevent> kq_events_(init_event_size_); // for receive entry
         while (true)
         {
             // struct timespec timeout = {milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000};
-            int num_complete = kevent(kq_fd_, NULL, 0, event_entries.data(), event_entries.size(), nullptr);
-            for (int i = 0; i < num_complete; ++i)
+            int active_kq_events_num_ = kevent(kq_fd_, nullptr, 0, kq_events_.data(), kq_events_.size(), nullptr);
+            for (int i = 0; i < active_kq_events_num_; ++i)
             {
-                uint16_t fd = event_entries[i].ident;
+                uint16_t fd = kq_events_[i].ident;
                 if (fd != user_event_ident_)
                 {
-                    int16_t ev_filter = event_entries[i].filter;
-                    if ((event_entries[i].flags & EV_EOF != 0) || (event_entries[i].flags & EV_ERROR != 0))
+                    int16_t ev_filter = kq_events_[i].filter;
+                    if ((kq_events_[i].flags & EV_EOF != 0) || (kq_events_[i].flags & EV_ERROR != 0))
                     {
                         ev_filter = EVFilterSock;
                     }
@@ -80,9 +88,9 @@ public:
                     }
                 }
 
-                if (num_complete == event_entries.size())
+                if (active_kq_events_num_ == kq_events_.size())
                 {
-                    event_entries.resize(num_complete + 128);
+                    kq_events_.resize(active_kq_events_num_ + event_list_resize_increment_);
                 }
             }
         }
@@ -96,31 +104,31 @@ public:
     }
 
     // Trigger wakes up the poller blocked in waiting for network-events and runs jobs in asyncJobQueue.
-    bool Trigger(base::AsyncJobQueue::AsyncJob job)
+    bool Trigger(const base::AsyncJobQueue::AsyncJob& job)
     {
         if (async_job_queue_.Push(job) == 1)
         {
-            Wakeup();
+            return Wakeup();
         }
         return true;
     }
 
     // add kevent
-    bool AddRead(int fd)
+    bool AddRead(const int& fd)
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
         return KQueueEventChange(&evSet);
     }
 
-    bool AddWrite(int fd)
+    bool AddWrite(const int& fd)
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, NULL);
         return KQueueEventChange(&evSet);
     }
 
-    bool AddReadWrite(int fd)
+    bool AddReadWrite(const int& fd)
     {
         struct kevent evSet[2];
         EV_SET(&evSet[0], fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
@@ -129,21 +137,21 @@ public:
     }
 
     // delete kevent
-    bool DelRead(int fd)
+    bool DelRead(const int& fd)
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
         return KQueueEventChange(&evSet);
     }
 
-    bool DelWrite(int fd)
+    bool DelWrite(const int& fd)
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
         return KQueueEventChange(&evSet);
     }
 
-    bool DelReadWrite(int fd)
+    bool Delete(const int& fd)
     {
         struct kevent evSet[2];
         EV_SET(&evSet[0], fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
@@ -152,11 +160,11 @@ public:
     }
 
 private:
-    void Wakeup()
+    bool Wakeup()
     {
         struct kevent ev;
         EV_SET(&ev, user_event_ident_, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
-        KQueueEventChange(&ev);
+        return KQueueEventChange(&ev);
     }
 
     bool KQueueEventChange(const struct kevent* changelist, int nchanges = 1)
@@ -171,12 +179,11 @@ private:
 
 protected:
     Poller()
-        : user_event_ident_(0)
     {
         // async_job_queue_ = base::AsyncJobQueue();
         kq_fd_ = kqueue();
         struct kevent evSet;
-        EV_SET(&evSet, user_event_ident_, EV_ADD | EV_CLEAR, EVFILT_USER, 0, 0, NULL);
+        EV_SET(&evSet, user_event_ident_, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
         if (!KQueueEventChange(&evSet))
         {
             // TODO: error handle
@@ -186,5 +193,10 @@ protected:
         std::cout << "kqueue fd = " << kq_fd_ << std::endl;
     }
 };
+
+int Poller::user_event_ident_ = 0;
+int Poller::init_event_size_ = 64;
+int Poller::event_list_resize_increment_ = 128;
+int Poller::EVFilterSock = -0xd;
 
 } // namespace cqnet
