@@ -15,15 +15,18 @@
 int main(int argc, const char* argv[])
 {
     // Macos automatically binds both ipv4 and 6 when you do this.
+    // 构建endpoint
     struct sockaddr_in6 addr = {};
     addr.sin6_len = sizeof(addr);
     addr.sin6_family = AF_INET6;
     addr.sin6_addr = in6addr_any; //(struct in6_addr){}; // 0.0.0.0 / ::
     addr.sin6_port = htons(9999);
 
+    // 创建本地的fd
     int localFd = socket(addr.sin6_family, SOCK_STREAM, 0);
     assert(localFd != -1);
 
+    // bind
     int on = 1;
     setsockopt(localFd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     if (bind(localFd, (struct sockaddr*)&addr, sizeof(addr)) == -1)
@@ -33,8 +36,10 @@ int main(int argc, const char* argv[])
     }
     assert(listen(localFd, 5) != -1);
 
+    // 创建kqueue
     int kq = kqueue();
 
+    // 向kqueue的增加listen socket 的 read事件
     struct kevent evSet;
     EV_SET(&evSet, localFd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     assert(-1 != kevent(kq, &evSet, 1, NULL, 0, NULL));
@@ -62,6 +67,7 @@ int main(int argc, const char* argv[])
             }
             else if (fd == localFd)
             {
+                // socket fd， 有新的链接进入
                 struct sockaddr_storage addr;
                 socklen_t socklen = sizeof(addr);
                 int connfd = accept(fd, (struct sockaddr*)&addr, &socklen);
@@ -84,12 +90,13 @@ int main(int argc, const char* argv[])
             {
                 // Read from socket.
                 char buf[1024];
+                // 读取的系统调用
                 size_t bytes_read = recv(fd, buf, sizeof(buf), 0);
                 printf("read %zu bytes\n", bytes_read);
             }
             else if (evList[i].filter == EVFILT_WRITE)
             {
-                //                printf("Ok to write more!\n");
+                printf("Ok to write more!\n");
 
                 off_t offset = (off_t)evList[i].udata;
                 off_t len = 0; //evList[i].data;
