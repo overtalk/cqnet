@@ -24,30 +24,22 @@ private:
     int kq_fd_;                           // kqueue fd
     base::AsyncJobQueue async_job_queue_; // async job queue
 
-private:
-    class PollerDeleter
-    {
-    public:
-        void operator()(Poller* ptr) const
-        {
-            delete ptr;
-        }
-    };
-
 public:
-    using Ptr = std::unique_ptr<Poller, PollerDeleter>;
     using Callback = std::function<bool(int, int16_t)>;
 
 public:
-    static Poller::Ptr OpenPoller()
+    Poller()
     {
-        class make_unique_enabler : public Poller
+        kq_fd_ = kqueue();
+        if (kq_fd_ == -1)
         {
-        public:
-            make_unique_enabler() {}
-        };
+            // TODO: error handler, failed to new kqueue
+        }
 
-        return Ptr(new make_unique_enabler());
+        if (!add_user_envent())
+        {
+            // TODO: failed to add user-defined event
+        }
     }
 
     // Close closes the poller.
@@ -61,7 +53,7 @@ public:
     {
         if (async_job_queue_.Push(job) == 1)
         {
-            return Wakeup();
+            return wake_up();
         }
         return true;
     }
@@ -127,22 +119,22 @@ public:
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        return KQEventChange(&evSet);
+        return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 
     bool AddWrite(const int& fd)
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        return KQEventChange(&evSet);
+        return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 
-    bool AddReadWrite(const int& fd)
+    bool AddReadWrite(const int& fd, void* meta)
     {
         struct kevent evSet[2];
-        EV_SET(&evSet[0], fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        EV_SET(&evSet[1], fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        return KQEventChange(evSet, 2);
+        EV_SET(&evSet[0], fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, meta);
+        EV_SET(&evSet[1], fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, meta);
+        return kevent(kq_fd_, evSet, 2, nullptr, 0, nullptr) == 0;
     }
 
     // delete kevent
@@ -150,14 +142,14 @@ public:
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
-        return KQEventChange(&evSet);
+        return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 
     bool DelWrite(const int& fd)
     {
         struct kevent evSet;
         EV_SET(&evSet, fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
-        return KQEventChange(&evSet);
+        return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 
     bool Delete(const int& fd)
@@ -174,41 +166,23 @@ public:
     }
 
 private:
-    bool Wakeup()
+    bool add_user_envent()
+    {
+        // add user event for make up
+        struct kevent ev;
+        EV_SET(&ev, user_event_ident_, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, nullptr);
+
+        struct timespec timeout = {0, 0};
+        return kevent(kq_fd_, &ev, 1, NULL, 0, &timeout) == 0;
+    }
+
+    bool wake_up()
     {
         struct kevent ev;
         EV_SET(&ev, user_event_ident_, EVFILT_USER, 0, NOTE_TRIGGER, 0, nullptr);
-        return KQEventChange(&ev);
-    }
 
-    bool KQEventChange(const struct kevent* changelist, int nchanges = 1)
-    {
-        if (kevent(kq_fd_, changelist, nchanges, nullptr, 0, nullptr) < 0)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-protected:
-    Poller()
-    {
-        // async_job_queue_ = base::AsyncJobQueue();
-        kq_fd_ = kqueue();
-        if (kq_fd_ < 0)
-        {
-            // TODO: error handler, failed to new kqueue
-        }
-        struct kevent evSet;
-        EV_SET(&evSet, user_event_ident_, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, nullptr);
-        if (!KQEventChange(&evSet))
-        {
-            // TODO: error handle
-        }
-
-        // TODO: del
-        std::cout << "kqueue fd = " << kq_fd_ << std::endl;
+        struct timespec timeout = {0, 0};
+        return kevent(kq_fd_, &ev, 1, NULL, 0, &timeout) == 0;
     }
 };
 

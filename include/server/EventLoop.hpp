@@ -2,6 +2,7 @@
 
 #include "base/Platform.hpp"
 #include "base/NonCopyable.hpp"
+#include "netpoll/NetPoll.hpp"
 
 namespace cqnet {
 
@@ -12,17 +13,15 @@ class EventLoop : public base::Noncopyable
 public:
     using Ptr = std::shared_ptr<EventLoop>;
 
+    netpoll::Poller* GetPoller()
+    {
+        return poller;
+    }
+
 private:
     int index_;
     const Server* svr_;
-
-public:
-    EventLoop(/* args */);
-    ~EventLoop();
+    netpoll::Poller* poller;
 };
-
-EventLoop::EventLoop(/* args */) {}
-
-EventLoop::~EventLoop() {}
 
 } // namespace cqnet
