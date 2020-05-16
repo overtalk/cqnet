@@ -9,7 +9,7 @@ static int SocketCreate(int af, int type, int protocol)
 
 static void SocketClose(int fd)
 {
-#ifdef PLATFORM_WINDOWS
+#ifdef CQNET_PLATFORM_WINDOWS
     ::closesocket(fd);
 #elif defined CQNET_PLATFORM_LINUX || defined CQNET_PLATFORM_DARWIN
     ::close(fd);
@@ -26,7 +26,7 @@ static bool SocketNonblock(int fd)
 {
     int err;
     unsigned long ul = true;
-#ifdef PLATFORM_WINDOWS
+#ifdef CQNET_PLATFORM_WINDOWS
     err = ioctlsocket(fd, FIONBIO, &ul);
 #elif defined CQNET_PLATFORM_LINUX || defined CQNET_PLATFORM_DARWIN
     err = ioctl(fd, FIONBIO, &ul);
