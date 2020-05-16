@@ -3,30 +3,45 @@
 #include "base/Platform.hpp"
 #include "base/NonCopyable.hpp"
 #include "base/Buffer.hpp"
+#include "server/NetAddr.hpp"
 #include "server/Codec.hpp"
 #include "server/EventLoop.hpp"
 
 namespace cqnet {
 
-class NetAddr;
-
 // conn should hold the fd of socket
 class NetConn : public base::Noncopyable
 {
+public:
+    using Ptr = std::shared_ptr<NetConn>;
+
 private:
-    int fd_;                     // file descriptor
-    bool opened_;                // connection opened event fired
-    Codec* codec_;               // codec for TCP
-    EventLoop* loop_;            // connected event-loop
-    const NetAddr* local_addr_;  // local addr
-    const NetAddr* remote_addr_; // remote addr
+    int fd_;                   // file descriptor
+    bool opened_;              // connection opened event fired
+    Codec::Ptr codec_;         // codec for TCP
+    EventLoop::Ptr loop_;      // connected event-loop
+    NetAddr::Ptr local_addr_;  // local addr
+    NetAddr::Ptr remote_addr_; // remote addr
+
     // 这个buffer在eventloop中读取数据的时候就直接读到这个里面
     base::CharBuffer inbound_buffer_;  // store data to read
     base::CharBuffer outbound_buffer_; // store data to send
 
 public:
-    NetConn();
+    Ptr static Create() {}
+
+    NetConn(int fd, EventLoop* loop)
+        : fd_(fd)
+        , loop_(loop)
+    {
+    }
+
     ~NetConn();
+
+    int GetFD()
+    {
+        return fd_;
+    }
 
     // this is used for Codec
     std::tuple<char*, size_t> Read()
@@ -54,7 +69,7 @@ public:
 
     bool Wakeup()
     {
-        EventLoop* event_loop = this->loop_;
+        EventLoop::Ptr event_loop = this->loop_;
 
         auto cb = [event_loop]() {
             // TODO: modify the function
@@ -72,12 +87,17 @@ public:
         return true;
     }
 
-    const NetAddr* LocalAddr()
+    bool IsOutBufferEmpty()
+    {
+        return outbound_buffer_.is_empty();
+    }
+
+    NetAddr::Ptr LocalAddr()
     {
         return local_addr_;
     }
 
-    const NetAddr* RemoteAddr()
+    NetAddr::Ptr RemoteAddr()
     {
         return remote_addr_;
     }

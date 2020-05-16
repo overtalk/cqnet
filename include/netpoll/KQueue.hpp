@@ -59,7 +59,7 @@ public:
     }
 
     // Polling blocks the current thread, waiting for network-events.
-    bool Polling(Callback& cb)
+    bool Polling(Callback cb)
     {
         bool wake_up = false;
         std::vector<struct kevent> kq_events_(init_event_list_size_);

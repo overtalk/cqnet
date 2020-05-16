@@ -24,9 +24,15 @@ public:
 
     void OnShutdown(Server* svr) {}
 
-    void OnOpened(const NetConn& conn) {}
+    std::tuple<char*, Action> OnOpened(NetConn* conn)
+    {
+        return std::make_pair<char*, Action>(nullptr, Action::None);
+    }
 
-    void OnClosed(const NetConn& conn) {}
+    Action OnClosed(NetConn* conn)
+    {
+        return Action::None;
+    }
 
     void PreWrite() {}
 

@@ -4,7 +4,7 @@
 #include <assert.h>
 
 #include "base/Platform.hpp"
-#include "netpoll/NetPoll.hpp"
+#include "net/NetPoll.hpp"
 
 bool hanlder(int ev_fd, int16_t ev)
 {
