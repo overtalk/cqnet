@@ -26,6 +26,17 @@ private:
     char recv_buffer_[1024];
     int recv_size;
 
+protected:
+    NetConn(int fd, EventLoop::Ptr loop, Codec::Ptr codec_)
+            : opened_(false)
+            , ConnSocket(fd, true)
+            , codec_(std::move(codec_))
+            , loop_(std::move(loop))
+    {
+    }
+
+    ~NetConn();
+
 public:
     using Ptr = std::shared_ptr<NetConn>;
 
@@ -33,28 +44,8 @@ public:
     // 然后将 read 事件注册到 epoll 中， 每次有read 事件，就调用这个 connection 的
     Ptr static Create(int fd, EventLoop::Ptr loop, Codec::Ptr codec)
     {
-        class make_shared_enabler : public NetConn
-        {
-        public:
-            make_shared_enabler(int fd, EventLoop::Ptr loop, Codec::Ptr codec)
-                : NetConn(fd, std::move(loop), std::move(codec))
-            {
-            }
-        };
-
-        return std::make_shared<make_shared_enabler>(fd, std::move(loop), std::move(codec));
+        return std::make_shared<NetConn>(fd, std::move(loop), std::move(codec));
     }
-
-protected:
-    NetConn(int fd, EventLoop::Ptr loop, Codec::Ptr codec_)
-        : opened_(false)
-        , ConnSocket(fd, true)
-        , codec_(std::move(codec_))
-        , loop_(std::move(loop))
-    {
-    }
-
-    ~NetConn();
 
 public:
     // this is used for Codec

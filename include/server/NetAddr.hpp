@@ -11,16 +11,12 @@ public:
 
     Ptr static Create()
     {
-        class make_shared_enabler : public NetAddr
-        {
-        };
-        return std::make_shared<make_shared_enabler>();
+        return std::make_shared<NetAddr>();
     }
-
-    ~NetAddr();
 
 protected:
     NetAddr();
+    ~NetAddr();
 };
 
 } // namespace cqnet

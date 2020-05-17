@@ -95,7 +95,7 @@ class ListenSocket : public FD
 {
 
 public:
-    explicit ListenSocket(int fd)
+    ListenSocket(int fd)
         : FD(fd)
     {
     }

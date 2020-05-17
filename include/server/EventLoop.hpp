@@ -28,16 +28,14 @@ private:
 public:
     using Ptr = std::shared_ptr<EventLoop>;
 
-    Ptr static Create()
+    Ptr static Create(int index)
     {
-        class make_shared_enabler : public EventLoop
-        {
-        };
-        return std::make_shared<make_shared_enabler>();
+        return std::make_shared<EventLoop>(index);
     }
 
 protected:
-    EventLoop(){};
+    EventLoop(int index)
+        :index_(index){};
 
 public:
     netpoll::Poller* GetPoller()
@@ -79,11 +77,11 @@ private:
             return true;
         }
 
-        return Accept(fd);
+        return AcceptConn(fd);
     }
 
     // accept a new tcp connection
-    bool Accept(int fd)
+    bool AcceptConn(int fd)
     {
         // 判断是否为 listen socket 发送了事件
         if (svr_->GetFD() == fd)
@@ -95,9 +93,8 @@ private:
             }
 
             // TODO: use smart ptr
-            std::shared_ptr<NetConn> conn(NetConn::Create(new_conn_fd, shared_from_this(), codec_->shared_from_this()));
+            auto conn = NetConn::Create(new_conn_fd, this->shared_from_this(), codec_->shared_from_this());
             conn->SetNonblock();
-            // TODO: set nonblock
 
             if (poller_->AddRead(new_conn_fd))
             {
@@ -110,7 +107,7 @@ private:
         return false;
     }
 
-    bool OpenConn(NetConn* conn)
+    bool OpenConn(NetConn::Ptr conn)
     {
         // TODO: set conn address
         auto tup = event_handler_->OnOpened(conn);
@@ -120,17 +117,17 @@ private:
         auto action = std::get<1>(tup);
     }
 
-    bool ReadConn(NetConn* conn)
+    bool ReadConn(NetConn::Ptr conn)
     {
         return true;
     }
 
-    bool WriteConn(NetConn* conn)
+    bool WriteConn(NetConn::Ptr conn)
     {
         return true;
     }
 
-    bool WakeConn(NetConn* conn)
+    bool WakeConn(NetConn::Ptr conn)
     {
         return true;
     }
