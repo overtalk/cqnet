@@ -5,17 +5,14 @@
 
 namespace cqnet {
 
-using IterateFunc = std::function<bool(int, int)>;
-
-class EventLoopGroup
+class IEventLoopGroup
 {
 public:
+    using IterateFunc = std::function<bool(int, EventLoop::Ptr)>;
+
     virtual void Register(EventLoop::Ptr el) = 0;
-
     virtual void Iterate(IterateFunc func) = 0;
-
     virtual size_t Len() = 0;
-
     virtual EventLoop::Ptr Next() = 0;
 };
 
@@ -29,7 +26,7 @@ private:
 public:
     void Register(EventLoop::Ptr el)
     {
-        event_loops.push_back(el);
+        event_loops.push_back(std::move(el));
         size_++;
     }
 
@@ -48,15 +45,15 @@ public:
         return el;
     }
 
-    void Iterate(IterateFunc func)
+    void Iterate(IEventLoopGroup::IterateFunc func)
     {
-        // for (int i = 0; i < event_loops.size(); i++)
-        // {
-        //     if (!func(i, event_loops[i]))
-        //     {
-        //         break;
-        //     }
-        // }
+        for (int i = 0; i < event_loops.size(); i++)
+        {
+            if (!func(i, event_loops[i]))
+            {
+                break;
+            }
+        }
     }
 };
 

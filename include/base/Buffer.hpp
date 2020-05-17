@@ -34,14 +34,14 @@ public:
     {
         bool write_ret = true;
 
-        if (get_write_valid_count() >= len)
+        if (get_writable_count() >= len)
         {
             memcpy(get_write_ptr(), data, len);
             add_write_pos(len);
         }
         else
         {
-            size_t left_len = data_size_ - get_length();
+            size_t left_len = data_size_ - get_size();
 
             if (left_len >= len)
             {
@@ -67,7 +67,7 @@ public:
         return write_ret;
     }
 
-    T* get_data()
+    T* get_read_ptr()
     {
         if (read_pos_ < data_size_)
         {
@@ -106,9 +106,14 @@ public:
         return data_size_ - write_pos_;
     }
 
-    std::tuple<T*, size_t> get_data_with_readable_size()
+    std::tuple<T*, size_t> get_read_ptr_with_readable_count()
     {
-        return std::make_pair<T*, size_t>(get_data(), get_readable_count());
+        return std::make_pair<T*, size_t>(get_read_ptr(), get_readable_count());
+    }
+
+    std::tuple<T*, size_t> get_write_ptr_with_writable_count()
+    {
+        return std::make_pair<T*, size_t>(get_write_ptr(), get_writable_count());
     }
 
     void reset()
@@ -127,7 +132,7 @@ private:
             return;
         }
 
-        len = get_length();
+        len = get_size();
 
         if (len > 0)
         {

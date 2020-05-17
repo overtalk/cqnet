@@ -6,7 +6,7 @@
 namespace cqnet {
 namespace base {
 
-class WaitGroup : public Noncopyable
+class WaitGroup : public NonCopyable
 {
 private:
     std::mutex mMutex;

@@ -3,15 +3,15 @@
 namespace cqnet {
 namespace base {
 
-class Noncopyable
+class NonCopyable
 {
 protected:
-    Noncopyable() = default;
-    ~Noncopyable() = default;
-    Noncopyable(const Noncopyable&) = delete;
-    Noncopyable& operator=(const Noncopyable&) = delete;
-    Noncopyable(Noncopyable&&) = delete;
-    Noncopyable& operator=(Noncopyable&&) = delete;
+    NonCopyable() = default;
+    ~NonCopyable() = default;
+    NonCopyable(const NonCopyable&) = delete;
+    NonCopyable& operator=(const NonCopyable&) = delete;
+    NonCopyable(NonCopyable&&) = delete;
+    NonCopyable& operator=(NonCopyable&&) = delete;
 };
 
 } // namespace base

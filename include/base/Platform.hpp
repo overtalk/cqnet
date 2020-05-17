@@ -22,6 +22,7 @@
 
 // macos plarform
 #ifdef CQNET_PLATFORM_DARWIN
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>

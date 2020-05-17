@@ -4,15 +4,16 @@
 #include "netpoll/NetPoll.hpp"
 #include "server/EventHandler.hpp"
 #include "server/LoadBalance.hpp"
+#include "server/NetSocket.hpp"
 
 namespace cqnet {
 
-class CQNetServer
+class CQNetServer : public ListenSocket
 {
 private:
     base::WaitGroup wg_;
     EventHandler& event_handler_;
-    EventLoopGroup* event_loop_group_;
+    IEventLoopGroup* event_loop_group_;
 
 public:
     template<class T>
@@ -27,11 +28,6 @@ public:
     }
 
     ~CQNetServer();
-
-    int GetListenerFD()
-    {
-        return 0;
-    }
 };
 
 } // namespace cqnet

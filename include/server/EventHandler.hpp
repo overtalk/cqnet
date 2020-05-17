@@ -1,10 +1,10 @@
 #pragma once
 
 #include "base/Platform.hpp"
+#include "server/NetConn.hpp"
 
 namespace cqnet {
 
-class NetConn;
 class Server;
 
 enum class Action : uint8_t
@@ -29,7 +29,7 @@ public:
         return std::make_pair<char*, Action>(nullptr, Action::None);
     }
 
-    Action OnClosed(NetConn* conn)
+    Action OnClosed(NetConn::Ptr conn)
     {
         return Action::None;
     }

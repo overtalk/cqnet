@@ -7,7 +7,7 @@ namespace cqnet {
 
 class NetConn;
 
-class Codec
+class Codec : public std::enable_shared_from_this<Codec>
 {
 public:
     using Ptr = std::shared_ptr<Codec>;

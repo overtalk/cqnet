@@ -6,62 +6,52 @@
 
 namespace cqnet {
 
-class FD : public base::Noncopyable
+class ConnSocket;
+class ListenSocket;
+
+// FD defines the file desc
+class FD : public base::NonCopyable
 {
 private:
     int fd_;
 
 public:
-    explicit FD(int fd)
+    FD(int fd)
         : fd_(fd)
     {
     }
 
     ~FD()
     {
-        ::close(fd_);
+        base::SocketClose(fd_);
     }
 
     int GetFD()
     {
         return fd_;
     }
+
+    friend ConnSocket;
+    friend ListenSocket;
 };
 
 // tcp listener
 // client & server side
-class TcpSocket
-    : public FD
-    , public base::Noncopyable
-
+class ConnSocket : public FD
 {
 private:
     bool server_side_;
 
-    class TcpSocketDeleter
-    {
-    public:
-        void operator()(TcpSocket* ptr) const
-        {
-            delete ptr;
-        }
-    };
-
 public:
-    using Ptr = std::unique_ptr<TcpSocket, TcpSocketDeleter>;
-
-    Ptr static Create(int fd, bool server_side)
+    ConnSocket(int fd, bool server_side)
+        : FD(fd)
+        , server_side_(server_side)
     {
-        class make_unique_enabler : public TcpSocket
-        {
-        public:
-            make_unique_enabler(int fd, bool server_side)
-                : TcpSocket(fd, server_side)
-            {
-            }
-        };
+    }
 
-        return Ptr(new make_unique_enabler(fd, server_side));
+    ~ConnSocket()
+    {
+        base::SocketClose(fd_);
     }
 
     bool IsServerSide()
@@ -71,73 +61,54 @@ public:
 
     bool SetNonblock()
     {
-        return SocketNonblock(GetFD());
+        return base::SocketNonblock(fd_);
     }
 
     void SetNodelay()
     {
-        SocketNodelay(GetFD());
+        base::SocketNodelay(fd_);
     }
 
     void SetSendSize(int s_size)
     {
-        SocketSetSendSize(GetFD(), s_size);
+        base::SocketSetSendSize(fd_, s_size);
     }
 
     void SetReadSize(int r_size)
     {
-        SocketSetRecvSize(GetFD(), r_size);
+        base::SocketSetRecvSize(fd_, r_size);
     }
 
-protected:
-    TcpSocket(int fd, bool server_side)
-        : FD(fd)
-        , server_side_(server_side)
+    int SendToSocket(char* send_ptr, int try_send)
     {
+        return base::SocketSend(fd_, send_ptr, try_send);
     }
 
-    ~TcpSocket()
+    int RecvFromSocket(char* recv_ptr, int try_recv)
     {
-        SocketClose(GetFD());
+        return base::SocketRecv(fd_, recv_ptr, try_recv);
     }
 };
 
 // tcp listener
-class ListenSocket
-    : public base::Noncopyable
-    , public FD
+class ListenSocket : public FD
 {
 
-private:
-    class ListenSocketDeleter
-    {
-    public:
-        void operator()(ListenSocket* ptr) const
-        {
-            delete ptr;
-        }
-    };
-
 public:
-    using Ptr = std::unique_ptr<ListenSocket, ListenSocketDeleter>;
-    static Ptr Create(int fd)
+    explicit ListenSocket(int fd)
+        : FD(fd)
     {
-        class make_unique_enabler : public ListenSocket
-        {
-        public:
-            explicit make_unique_enabler(int fd)
-                : ListenSocket(fd)
-            {
-            }
-        };
-
-        return Ptr(new make_unique_enabler(fd));
     }
 
-    TcpSocket::Ptr Accept()
+    ~ListenSocket()
     {
-        const auto clientFD = SocketAccept(GetFD(), nullptr, nullptr);
-        if (clientFD == CQNET_INVALID_SOCKET)
+        base::SocketClose(fd_);
+    }
+
+    int Accept()
+    {
+        const auto conn_fd = base::SocketAccept(fd_, nullptr, nullptr);
+        if (conn_fd == CQNET_INVALID_SOCKET)
         {
             // TODO: handle error
             // if (EINTR == BRYNET_ERRNO)
@@ -150,18 +121,7 @@ public:
             // }
         }
 
-        return TcpSocket::Create(clientFD, true);
-    }
-
-protected:
-    explicit ListenSocket(int fd)
-        : FD(fd)
-    {
-    }
-
-    ~ListenSocket()
-    {
-        SocketClose(GetFD());
+        return conn_fd;
     }
 };
 

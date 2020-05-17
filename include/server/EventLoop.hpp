@@ -12,21 +12,22 @@ namespace cqnet {
 // 他的功能就是监听io事件，然后调用对应的处理函数
 // 并且需要保存链接
 // RUN 方法启动，会一直监听事件，然后去处理
-class EventLoop : public base::Noncopyable
+class EventLoop
+    : public base::NonCopyable
+    , std::enable_shared_from_this<EventLoop>
 {
-public:
-    using Ptr = std::shared_ptr<EventLoop>;
-
 private:
     int index_;        // event loop index
     Codec::Ptr codec_; // codec for TCP
     CQNetServer* svr_;
     netpoll::Poller* poller_;         // epoll or kqueue
     std::atomic<int32_t> conn_count_; // number of active connections in event-loop
-    std::unordered_map<int, NetConn*> connections_;
+    std::unordered_map<int, NetConn::Ptr> connections_;
     EventHandler* event_handler_;
 
 public:
+    using Ptr = std::shared_ptr<EventLoop>;
+
     Ptr static Create()
     {
         class make_shared_enabler : public EventLoop
@@ -35,9 +36,12 @@ public:
         return std::make_shared<make_shared_enabler>();
     }
 
+protected:
+    EventLoop(){};
+
+public:
     netpoll::Poller* GetPoller()
     {
-
         return poller_;
     }
 
@@ -54,7 +58,7 @@ private:
         auto iter = connections_.find(fd);
         if (iter != connections_.end())
         {
-            NetConn* conn = iter->second;
+            std::shared_ptr<NetConn> conn = iter->second;
             switch (conn->IsOutBufferEmpty())
             {
             case false:
@@ -81,17 +85,23 @@ private:
     // accept a new tcp connection
     bool Accept(int fd)
     {
-        if (svr_->GetListenerFD() == fd)
+        // 判断是否为 listen socket 发送了事件
+        if (svr_->GetFD() == fd)
         {
-            int new_conn_fd = ::accept(fd, nullptr, nullptr);
+            int new_conn_fd = svr_->Accept();
+            if (new_conn_fd == CQNET_INVALID_SOCKET)
+            {
+                //TODO: error handle
+            }
 
             // TODO: use smart ptr
-            NetConn* conn = new NetConn(new_conn_fd, this);
+            std::shared_ptr<NetConn> conn(NetConn::Create(new_conn_fd, shared_from_this(), codec_->shared_from_this()));
+            conn->SetNonblock();
             // TODO: set nonblock
 
             if (poller_->AddRead(new_conn_fd))
             {
-                connections_.insert(std::pair<int, NetConn*>(new_conn_fd, conn));
+                connections_.insert(std::pair<int, NetConn::Ptr>(new_conn_fd, conn));
                 PlusConnCount();
                 return true;
             }
@@ -129,18 +139,18 @@ private:
     {
         for (auto& conn : connections_)
         {
-            CloseConn(conn.second);
+            CloseConn(std::move(conn.second));
         }
     }
 
-    bool CloseConn(NetConn* conn)
+    bool CloseConn(NetConn::Ptr conn)
     {
         if (!conn->IsOutBufferEmpty())
         {
             // TODO: write to client
         }
 
-        int fd = conn->GetFD();
+        int fd = 1;
         poller_->Delete(fd);
         conn->Close();
         // delete from the map
@@ -172,9 +182,6 @@ private:
     {
         return conn_count_.load();
     }
-
-protected:
-    EventLoop() = default;
 };
 
 } // namespace cqnet
