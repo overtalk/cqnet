@@ -29,42 +29,27 @@ public:
         delete[] data_;
     }
 
-    // TODO: change to void
-    bool write(const T* data, size_t len)
+    void write(const T* data, size_t len)
     {
-        bool write_ret = true;
-
         if (get_writable_count() >= len)
         {
             memcpy(get_write_ptr(), data, len);
             add_write_pos(len);
+            return;
+        }
+
+        size_t left_len = data_size_ - get_readable_count();
+        if (left_len >= len)
+        {
+            adjust_to_head();
+            write(data, len);
         }
         else
         {
-            size_t left_len = data_size_ - get_size();
-
-            if (left_len >= len)
-            {
-                adjust_to_head();
-                write(data, len);
-            }
-            else
-            {
-                size_t needLen = len - left_len;
-
-                if (needLen > 0)
-                {
-                    grow(needLen);
-                    write(data, len);
-                }
-                else
-                {
-                    write_ret = false;
-                }
-            }
+            size_t need_len = len - left_len;
+            grow(need_len);
+            write(data, len);
         }
-
-        return write_ret;
     }
 
     T* get_read_ptr()
@@ -132,7 +117,7 @@ private:
             return;
         }
 
-        len = get_size();
+        len = get_readable_count();
 
         if (len > 0)
         {
@@ -163,10 +148,6 @@ private:
         }
     }
 
-    size_t get_size()
-    {
-        return data_size_;
-    }
 
     T* get_write_ptr()
     {

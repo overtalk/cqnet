@@ -14,4 +14,4 @@ FILE(GLOB_RECURSE HEADER_LIST
         "${PROJECT_SOURCE_DIR}/include/server/*.hpp"
 )
 
-add_executable(test a.cpp ${HEADER_LIST})
+add_executable(test a.cpp ${HEADER_LIST} examples/main.cpp)

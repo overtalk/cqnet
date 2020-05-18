@@ -2,9 +2,9 @@
 
 #include "base/WaitGroup.hpp"
 #include "netpoll/NetPoll.hpp"
-#include "server/EventHandler.hpp"
-#include "server/LoadBalance.hpp"
-#include "server/NetSocket.hpp"
+#include "EventHandler.hpp"
+#include "LoadBalance.hpp"
+#include "NetSocket.hpp"
 
 namespace cqnet {
 

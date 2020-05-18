@@ -3,48 +3,61 @@
 #include "base/Platform.hpp"
 #include "base/NonCopyable.hpp"
 #include "base/Buffer.hpp"
-#include "server/NetAddr.hpp"
-#include "server/Codec.hpp"
-#include "server/EventLoop.hpp"
-#include "server/NetSocket.hpp"
+#include "netpoll/NetPoll.hpp"
+#include "NetAddr.hpp"
+#include "NetSocket.hpp"
 
 namespace cqnet {
 
-// conn should hold the fd of socket
 class NetConn : public ConnSocket
 {
-private:
-    bool opened_;              // connection opened event fired
-    Codec::Ptr codec_;         // codec for TCP
-    EventLoop::Ptr loop_;      // connected event-loop
-    NetAddr::Ptr local_addr_;  // local addr
-    NetAddr::Ptr remote_addr_; // remote addr
-    // 这个buffer在eventloop中读取数据的时候就直接读到这个里面
-    base::CharBuffer inbound_buffer_;  // store data to read
-    base::CharBuffer outbound_buffer_; // store data to send
-    // 读socket数据时候的缓冲队列
-    char recv_buffer_[1024];
-    int recv_size;
-
-protected:
-    NetConn(int fd, EventLoop::Ptr loop, Codec::Ptr codec_)
-            : opened_(false)
-            , ConnSocket(fd, true)
-            , codec_(std::move(codec_))
-            , loop_(std::move(loop))
-    {
-    }
-
-    ~NetConn();
-
 public:
     using Ptr = std::shared_ptr<NetConn>;
+    using EncodeFunc = std::function<char*(std::shared_ptr<NetConn>, char*)>;
+    using DecodeFunc = std::function<char*(std::shared_ptr<NetConn>)>;
 
+private:
+    bool opened_;              // connection opened event fired
+    int recv_size;
+    char recv_buffer_[1024];
+    EncodeFunc encode_func_;
+    DecodeFunc decode_func_;
+    NetAddr::Ptr local_addr_;  // local addr
+    NetAddr::Ptr remote_addr_; // remote addr
+    netpoll::KQueue::Ptr kqueue_;  // connected event-loop
+    base::CharBuffer inbound_buffer_;  // store data to read
+    base::CharBuffer outbound_buffer_; // store data to send
+
+protected:
+    NetConn(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
+        : ConnSocket(fd, true)
+        , opened_(false)
+        , recv_size(0)
+        , encode_func_(std::move(encode_func))
+        , decode_func_(std::move(decode_func))
+        , kqueue_(std::move(kqueue))
+        , inbound_buffer_( base::CharBuffer())
+        , outbound_buffer_( base::CharBuffer(0))
+    {
+        //TODO: net address
+    }
+
+    ~NetConn(){}
+
+public:
     // 在 event loop 中， 每次 accept 到一个 fd，就调用这个方法创建一个 connection
     // 然后将 read 事件注册到 epoll 中， 每次有read 事件，就调用这个 connection 的
-    Ptr static Create(int fd, EventLoop::Ptr loop, Codec::Ptr codec)
+    Ptr static Create(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
     {
-        return std::make_shared<NetConn>(fd, std::move(loop), std::move(codec));
+        class make_shared_enabler : public NetConn
+        {
+        public:
+            make_shared_enabler(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
+                :NetConn(fd, std::move(kqueue), std::move(encode_func), std::move(decode_func))
+            {}
+        };
+
+        return std::make_shared<make_shared_enabler>(fd, std::move(kqueue), std::move(encode_func), std::move(decode_func));
     }
 
 public:
@@ -102,23 +115,23 @@ public:
         if (send_size < size)
         {
             outbound_buffer_.write(data + send_size, size - send_size);
-            loop_->GetPoller()->AddWrite(GetFD());
+            kqueue_->AddWrite(GetFD());
         }
         return true;
     }
 
     bool Wakeup()
     {
-        EventLoop::Ptr event_loop = this->loop_;
+        auto kqueue = this->kqueue_;
 
-        auto cb = [event_loop]() {
+        auto cb = [kqueue]() {
             // TODO: modify the function
             auto c = [] { return false; };
-            event_loop->GetPoller()->Trigger(c);
+            kqueue->Trigger(c);
             return false;
         };
 
-        return loop_->GetPoller()->Trigger(cb);
+        return kqueue_->Trigger(cb);
     }
 
     bool Close()

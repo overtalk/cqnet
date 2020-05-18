@@ -64,7 +64,7 @@ public:
         return base::SocketNonblock(fd_);
     }
 
-    void SetNodelay()
+    void SetNoDelay()
     {
         base::SocketNodelay(fd_);
     }
@@ -93,7 +93,6 @@ public:
 // tcp listener
 class ListenSocket : public FD
 {
-
 public:
     ListenSocket(int fd)
         : FD(fd)

@@ -7,12 +7,12 @@
 namespace cqnet {
 namespace netpoll {
 
-class Poller : public base::NonCopyable
+class KQueue : public base::NonCopyable
 {
 public:
     // EVFilterSock represents exceptional events that are not read/write, like socket being closed,
     // reading/writing from/to a closed socket, etc.
-    static const int EVFilterSock;
+    static const int event_filter_sock_;
     // for wake up
     static const int user_event_ident_;
     // init_event_size_ represents the initial length of poller event-list.
@@ -24,22 +24,38 @@ private:
     int kq_fd_;                           // kqueue fd
     base::AsyncJobQueue async_job_queue_; // async job queue
 
-public:
-    using Callback = std::function<bool(int, int16_t)>;
-
-public:
-    Poller()
+protected:
+    KQueue()
     {
         kq_fd_ = kqueue();
         if (kq_fd_ == -1)
         {
+            std::cout << "failed to create kq, kq id = " << kq_fd_ << std::endl;
             // TODO: error handler, failed to new kqueue
         }
 
-        if (!add_user_envent())
+        if (!add_user_event())
         {
             // TODO: failed to add user-defined event
         }
+    }
+
+    ~KQueue(){}
+
+public:
+    using Callback = std::function<bool(int, int16_t)>;
+    using Ptr = std::shared_ptr<KQueue>;
+
+    Ptr static Create()
+    {
+        class make_shared_enabler : public KQueue
+        {
+        public:
+            make_shared_enabler()
+                :KQueue() {}
+        };
+
+        return std::make_shared<make_shared_enabler>();
     }
 
     // Close closes the poller.
@@ -64,26 +80,23 @@ public:
         bool wake_up = false;
         std::vector<struct kevent> kq_events_(init_event_list_size_);
 
+       int milliseconds = 0;
         while (true)
         {
-            // struct timespec timeout = {milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000};
-            int active_kq_events_num_ = kevent(kq_fd_, nullptr, 0, kq_events_.data(), kq_events_.size(), nullptr);
+            struct timespec timeout = {milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000};
+            int active_kq_events_num_ = kevent(kq_fd_, nullptr, 0, kq_events_.data(), kq_events_.size(), &timeout);
             for (int i = 0; i < active_kq_events_num_; ++i)
             {
-                uint16_t fd = kq_events_[i].ident;
+                const struct kevent& event = kq_events_[i];
+                int fd = event.ident;
+                int16_t ev_filter = kq_events_[i].filter;
+                uint16_t ev_flags = kq_events_[i].flags;
+
                 if (fd != user_event_ident_)
                 {
-                    int16_t ev_filter = kq_events_[i].filter;
-                    if ((kq_events_[i].flags & EV_EOF))
+                    if (((ev_flags & EV_EOF) != 0) || ((ev_flags & EV_ERROR) != 0))
                     {
-                        printf("Disconnect\n");
-                        close(fd);
-                        // Socket is automatically removed from the kq by the kernel.
-                        continue;
-                    }
-                    else if (kq_events_[i].flags & EV_ERROR)
-                    {
-                        ev_filter = EVFilterSock;
+                        ev_filter = event_filter_sock_;
                     }
 
                     if (!cb(fd, ev_filter))
@@ -118,22 +131,22 @@ public:
     bool AddRead(const int& fd)
     {
         struct kevent evSet;
-        EV_SET(&evSet, fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, nullptr);
+        EV_SET(&evSet, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
         return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 
     bool AddWrite(const int& fd)
     {
         struct kevent evSet;
-        EV_SET(&evSet, fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
+        EV_SET(&evSet, fd, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
         return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 
     bool AddReadWrite(const int& fd, void* meta)
     {
         struct kevent evSet[2];
-        EV_SET(&evSet[0], fd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, meta);
-        EV_SET(&evSet[1], fd, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, meta);
+        EV_SET(&evSet[0], fd, EVFILT_READ, EV_ADD, 0, 0, meta);
+        EV_SET(&evSet[1], fd, EVFILT_WRITE, EV_ADD, 0, 0, meta);
         return kevent(kq_fd_, evSet, 2, nullptr, 0, nullptr) == 0;
     }
 
@@ -166,7 +179,7 @@ public:
     }
 
 private:
-    bool add_user_envent()
+    bool add_user_event()
     {
         // add user event for make up
         struct kevent ev;
@@ -186,10 +199,10 @@ private:
     }
 };
 
-const int Poller::user_event_ident_ = 0;
-const int Poller::init_event_list_size_ = 64;
-const int Poller::event_list_resize_increment_ = 128;
-const int Poller::EVFilterSock = -0xd;
+const int KQueue::user_event_ident_ = 0;
+const int KQueue::init_event_list_size_ = 64;
+const int KQueue::event_list_resize_increment_ = 128;
+const int KQueue::event_filter_sock_ = -0xd;
 
 } // namespace netpoll
 } // namespace cqnet
