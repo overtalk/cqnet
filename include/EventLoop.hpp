@@ -3,19 +3,13 @@
 #include "base/Platform.hpp"
 #include "base/NonCopyable.hpp"
 #include "netpoll/NetPoll.hpp"
+#include "Interface.hpp"
 #include "NetConn.hpp"
-#include "EventHandler.hpp"
 #include "CQNetServer.hpp"
 
 namespace cqnet {
 
 // this is for decode
-class ICodec
-{
-public:
-    virtual char* Encode(NetConn::Ptr conn, char* buf) = 0;
-    virtual char* Decode(NetConn::Ptr conn) = 0;
-};
 
 // 他的功能就是监听io事件，然后调用对应的处理函数
 // 并且需要保存链接

@@ -2,8 +2,7 @@
 
 #include "base/WaitGroup.hpp"
 #include "netpoll/NetPoll.hpp"
-#include "EventHandler.hpp"
-#include "LoadBalance.hpp"
+#include "Interface.hpp"
 #include "NetSocket.hpp"
 
 namespace cqnet {
@@ -12,14 +11,14 @@ class CQNetServer : public ListenSocket
 {
 private:
     base::WaitGroup wg_;
-    EventHandler& event_handler_;
-    IEventLoopGroup* event_loop_group_;
+    std::shared_ptr<IEventHandler> event_handler_;
+    std::shared_ptr<IEventLoopGroup> event_loop_group_;
 
 public:
     template<class T>
     CQNetServer()
     {
-        if (!std::is_base_of<EventHandler, T>::value)
+        if (!std::is_base_of<IEventHandler, T>::value)
         {
             // TODO: error handler;
         }
