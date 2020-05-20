@@ -7,14 +7,16 @@
 
 namespace cqnet {
 
-class CQNetServer : public ListenSocket
+class CQNetServer : public TcpListenSocket
 {
 private:
     base::WaitGroup wg_;
     std::shared_ptr<IEventHandler> event_handler_;
-    std::shared_ptr<IEventLoopGroup> event_loop_group_;
+    std::shared_ptr<ILoadBalance> event_loop_group_;
 
 public:
+    using Ptr = std::shared_ptr<CQNetServer>;
+
     template<class T>
     CQNetServer()
     {

@@ -5,7 +5,7 @@
 
 namespace cqnet {
 
-    class RoundRobinEventLoopGroup : public  IEventLoopGroup
+    class RoundRobinLoadBalance : public ILoadBalance
     {
     private:
         size_t size_;

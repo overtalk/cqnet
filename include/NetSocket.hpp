@@ -7,7 +7,7 @@
 namespace cqnet {
 
 class ConnSocket;
-class ListenSocket;
+class TcpListenSocket;
 
 // FD defines the file desc
 class FD : public base::NonCopyable
@@ -32,19 +32,37 @@ public:
     }
 
     friend ConnSocket;
-    friend ListenSocket;
+    friend TcpListenSocket;
+};
+
+class Socket : public FD
+{
+public:
+    Socket(int fd)
+        :FD(fd)
+    {}
+
+    int Read(char* send_ptr, int try_send)
+    {
+        return -1;
+    }
+
+    int Write(char* send_ptr, int try_send)
+    {
+        return -1;
+    }
 };
 
 // tcp listener
 // client & server side
-class ConnSocket : public FD
+class ConnSocket : public Socket
 {
 private:
     bool server_side_;
 
 public:
     ConnSocket(int fd, bool server_side)
-        : FD(fd)
+        : Socket(fd)
         , server_side_(server_side)
     {
     }
@@ -79,32 +97,32 @@ public:
         base::SocketSetRecvSize(fd_, r_size);
     }
 
-    int SendToSocket(char* send_ptr, int try_send)
+    int Write(char* send_ptr, int try_send) override
     {
         return base::SocketSend(fd_, send_ptr, try_send);
     }
 
-    int RecvFromSocket(char* recv_ptr, int try_recv)
+    int Read(char* recv_ptr, int try_recv) override
     {
         return base::SocketRecv(fd_, recv_ptr, try_recv);
     }
 };
 
 // tcp listener
-class ListenSocket : public FD
+class TcpListenSocket : public Socket
 {
 public:
-    ListenSocket(int fd)
-        : FD(fd)
+    TcpListenSocket(int fd)
+        : Socket(fd)
     {
     }
 
-    ~ListenSocket()
+    ~TcpListenSocket()
     {
         base::SocketClose(fd_);
     }
 
-    int Accept()
+    int Read(char* send_ptr, int try_send) override
     {
         const auto conn_fd = base::SocketAccept(fd_, nullptr, nullptr);
         if (conn_fd == CQNET_INVALID_SOCKET)
@@ -121,6 +139,11 @@ public:
         }
 
         return conn_fd;
+    }
+
+    int Write(char* send_ptr, int try_send) override
+    {
+        return -1;
     }
 };
 

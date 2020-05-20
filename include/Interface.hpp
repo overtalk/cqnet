@@ -5,11 +5,8 @@
 namespace cqnet {
 
     class NetConn;
-
     class EventLoop;
-
     class CQNetServer;
-
     using IterateFunc = std::function<bool(int, std::shared_ptr<EventLoop>)>;
 
     enum class Action : uint8_t
@@ -32,21 +29,17 @@ namespace cqnet {
         virtual void Tick() = 0;
     };
 
-    class IEventLoopGroup {
+    class ILoadBalance {
     public:
         virtual void Register(std::shared_ptr <EventLoop> el) = 0;
-
         virtual void Iterate(IterateFunc func) = 0;
-
         virtual size_t Len() = 0;
-
         virtual std::shared_ptr <EventLoop> Next() = 0;
     };
 
     class ICodec {
     public:
         virtual char *Encode(std::shared_ptr<NetConn> conn, char *buf) = 0;
-
         virtual char *Decode(std::shared_ptr<NetConn> conn) = 0;
     };
 

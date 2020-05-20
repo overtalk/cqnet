@@ -10,9 +10,10 @@ include_directories(
 FILE(GLOB_RECURSE HEADER_LIST
 #        "${PROJECT_SOURCE_DIR}/include"
         "${PROJECT_SOURCE_DIR}/include/base/*.hpp"
-        "${PROJECT_SOURCE_DIR}/include/loadbalance/*.hpp"
+        "${PROJECT_SOURCE_DIR}/include/components/*.hpp"
         "${PROJECT_SOURCE_DIR}/include/netpoll/*.hpp"
         "${PROJECT_SOURCE_DIR}/include/*.hpp"
 )
 
-add_executable(test a.cpp ${HEADER_LIST})
+#add_executable(test a.cpp ${HEADER_LIST} include/codec/Codec.hpp)
+add_subdirectory(examples)

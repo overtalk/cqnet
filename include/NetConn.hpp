@@ -102,8 +102,9 @@ public:
             return true;
         }
 
+
         /*  send error if transnum < 0  */
-        int send_size = SendToSocket(data, size);
+        int send_size = Write(data, size);
         if (send_size < 0)
         {
             // TODO: close connection
