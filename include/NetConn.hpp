@@ -17,14 +17,14 @@ public:
     using DecodeFunc = std::function<char*(std::shared_ptr<NetConn>)>;
 
 private:
-    bool opened_;              // connection opened event fired
+    bool opened_; // connection opened event fired
     int recv_size;
     char recv_buffer_[1024];
     EncodeFunc encode_func_;
     DecodeFunc decode_func_;
-    NetAddr::Ptr local_addr_;  // local addr
-    NetAddr::Ptr remote_addr_; // remote addr
-    netpoll::KQueue::Ptr kqueue_;  // connected event-loop
+    NetAddr::Ptr local_addr_;          // local addr
+    NetAddr::Ptr remote_addr_;         // remote addr
+    netpoll::KQueue::Ptr kqueue_;      // connected event-loop
     base::CharBuffer inbound_buffer_;  // store data to read
     base::CharBuffer outbound_buffer_; // store data to send
 
@@ -36,13 +36,13 @@ protected:
         , encode_func_(std::move(encode_func))
         , decode_func_(std::move(decode_func))
         , kqueue_(std::move(kqueue))
-        , inbound_buffer_( base::CharBuffer())
-        , outbound_buffer_( base::CharBuffer(0))
+        , inbound_buffer_(base::CharBuffer())
+        , outbound_buffer_(base::CharBuffer(0))
     {
         //TODO: net address
     }
 
-    ~NetConn(){}
+    ~NetConn() {}
 
 public:
     // 在 event loop 中， 每次 accept 到一个 fd，就调用这个方法创建一个 connection
@@ -53,14 +53,15 @@ public:
         {
         public:
             make_shared_enabler(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
-                :NetConn(fd, std::move(kqueue), std::move(encode_func), std::move(decode_func))
-            {}
+                : NetConn(fd, std::move(kqueue), std::move(encode_func), std::move(decode_func))
+            {
+            }
         };
 
-        return std::make_shared<make_shared_enabler>(fd, std::move(kqueue), std::move(encode_func), std::move(decode_func));
+        return std::make_shared<make_shared_enabler>(
+            fd, std::move(kqueue), std::move(encode_func), std::move(decode_func));
     }
 
-public:
     // this is used for Codec
     // 从 buffer 中读取数据出来撒
     std::tuple<char*, size_t> ReadBuffer()
@@ -101,7 +102,6 @@ public:
             outbound_buffer_.write(data, size);
             return true;
         }
-
 
         /*  send error if transnum < 0  */
         int send_size = Write(data, size);

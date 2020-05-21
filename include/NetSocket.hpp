@@ -35,42 +35,21 @@ public:
     friend TcpListenSocket;
 };
 
-class Socket : public FD
-{
-public:
-    Socket(int fd)
-        :FD(fd)
-    {}
-
-    int Read(char* send_ptr, int try_send)
-    {
-        return -1;
-    }
-
-    int Write(char* send_ptr, int try_send)
-    {
-        return -1;
-    }
-};
-
 // tcp listener
 // client & server side
-class ConnSocket : public Socket
+class ConnSocket : public FD
 {
 private:
     bool server_side_;
 
 public:
     ConnSocket(int fd, bool server_side)
-        : Socket(fd)
+        : FD(fd)
         , server_side_(server_side)
     {
     }
 
-    ~ConnSocket()
-    {
-        base::SocketClose(fd_);
-    }
+    ~ConnSocket() {}
 
     bool IsServerSide()
     {
@@ -97,32 +76,30 @@ public:
         base::SocketSetRecvSize(fd_, r_size);
     }
 
-    int Write(char* send_ptr, int try_send) override
+    int Write(char* send_ptr, int try_send)
     {
         return base::SocketSend(fd_, send_ptr, try_send);
     }
 
-    int Read(char* recv_ptr, int try_recv) override
+    int Read(char* recv_ptr, int try_recv)
     {
         return base::SocketRecv(fd_, recv_ptr, try_recv);
     }
 };
 
 // tcp listener
-class TcpListenSocket : public Socket
+class TcpListenSocket : public FD
 {
 public:
     TcpListenSocket(int fd)
-        : Socket(fd)
+        : FD(fd)
     {
     }
 
-    ~TcpListenSocket()
-    {
-        base::SocketClose(fd_);
-    }
+    ~TcpListenSocket() {}
 
-    int Read(char* send_ptr, int try_send) override
+    // Read means accept a connection for tcp listener
+    int Read(char* send_ptr, int try_send)
     {
         const auto conn_fd = base::SocketAccept(fd_, nullptr, nullptr);
         if (conn_fd == CQNET_INVALID_SOCKET)
@@ -139,11 +116,6 @@ public:
         }
 
         return conn_fd;
-    }
-
-    int Write(char* send_ptr, int try_send) override
-    {
-        return -1;
     }
 };
 

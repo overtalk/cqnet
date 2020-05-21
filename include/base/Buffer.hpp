@@ -148,7 +148,6 @@ private:
         }
     }
 
-
     T* get_write_ptr()
     {
         if (write_pos_ < data_size_)

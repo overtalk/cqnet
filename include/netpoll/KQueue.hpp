@@ -40,7 +40,7 @@ protected:
         }
     }
 
-    ~KQueue(){}
+    ~KQueue() {}
 
 public:
     using Callback = std::function<bool(int, int16_t)>;
@@ -52,7 +52,9 @@ public:
         {
         public:
             make_shared_enabler()
-                :KQueue() {}
+                : KQueue()
+            {
+            }
         };
 
         return std::make_shared<make_shared_enabler>();
@@ -80,7 +82,7 @@ public:
         bool wake_up = false;
         std::vector<struct kevent> kq_events_(init_event_list_size_);
 
-       int milliseconds = 0;
+        int milliseconds = 0;
         while (true)
         {
             struct timespec timeout = {milliseconds / 1000, (milliseconds % 1000) * 1000 * 1000};

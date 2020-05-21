@@ -6,7 +6,7 @@ namespace cqnet {
 
 class Codec : public ICodec
 {
-    char* Encode(std::shared_ptr<NetConn> conn, char *buf)
+    char* Encode(std::shared_ptr<NetConn> conn, char* buf)
     {
         std::cout << "Encode" << std::endl;
         return "Encode";

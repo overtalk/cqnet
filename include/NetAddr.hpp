@@ -15,7 +15,9 @@ public:
         {
         public:
             make_shared_enabler()
-                :NetAddr() {}
+                : NetAddr()
+            {
+            }
         };
         return std::make_shared<make_shared_enabler>();
     }
@@ -23,7 +25,6 @@ public:
 protected:
     NetAddr();
     ~NetAddr();
-
 };
 
 } // namespace cqnet
