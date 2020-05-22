@@ -7,7 +7,6 @@
 namespace cqnet {
 
 class ConnSocket;
-class TcpListenSocket;
 
 // FD defines the file desc
 class FD : public base::NonCopyable
@@ -32,7 +31,6 @@ public:
     }
 
     friend ConnSocket;
-    friend TcpListenSocket;
 };
 
 // tcp listener
@@ -84,38 +82,6 @@ public:
     int Read(char* recv_ptr, int try_recv)
     {
         return base::SocketRecv(fd_, recv_ptr, try_recv);
-    }
-};
-
-// tcp listener
-class TcpListenSocket : public FD
-{
-public:
-    TcpListenSocket(int fd)
-        : FD(fd)
-    {
-    }
-
-    ~TcpListenSocket() {}
-
-    // Read means accept a connection for tcp listener
-    int Read(char* send_ptr, int try_send)
-    {
-        const auto conn_fd = base::SocketAccept(fd_, nullptr, nullptr);
-        if (conn_fd == CQNET_INVALID_SOCKET)
-        {
-            // TODO: handle error
-            // if (EINTR == BRYNET_ERRNO)
-            // {
-            //     throw EintrError();
-            // }
-            // else
-            // {
-            //     throw AcceptError(BRYNET_ERRNO);
-            // }
-        }
-
-        return conn_fd;
     }
 };
 

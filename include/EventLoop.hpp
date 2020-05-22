@@ -5,7 +5,7 @@
 #include "netpoll/NetPoll.hpp"
 #include "Interface.hpp"
 #include "NetConn.hpp"
-#include "CQNetServer.hpp"
+#include "NetListener.hpp"
 
 namespace cqnet {
 
@@ -15,23 +15,21 @@ class EventLoop
 {
 private:
     int index_; // event loop index
-    CQNetServer::Ptr svr_;
     NetConn::EncodeFunc encode_func_;
     NetConn::DecodeFunc decode_func_;
     std::unordered_map<int, NetConn::Ptr> connections_;
+    TcpListenSocket::Ptr tcp_listener_;
     netpoll::KQueue::Ptr kqueue_;     // epoll or kqueue
     std::atomic<int32_t> conn_count_; // number of active connections in event-loop
-    // some interface
+    // some interface for user-defined logic
     std::shared_ptr<ICodec> codec_;
     std::shared_ptr<IEventHandler> event_handler_;
 
 protected:
-    EventLoop(int index, std::shared_ptr<ICodec> codec, std::shared_ptr<IEventHandler> event_handler,
-        std::shared_ptr<CQNetServer> server)
+    EventLoop(int index, std::shared_ptr<ICodec> codec, std::shared_ptr<IEventHandler> event_handler)
         : index_(index)
         , codec_(codec)
         , event_handler_(event_handler)
-        , svr_(server)
         , kqueue_(netpoll::KQueue::Create())
     {
         auto encode_func = [codec](NetConn::Ptr conn, char* buf) { return codec->Encode(conn, buf); };
@@ -46,27 +44,29 @@ protected:
 public:
     using Ptr = std::shared_ptr<EventLoop>;
 
-    Ptr static Create(int index, std::shared_ptr<ICodec> codec, std::shared_ptr<IEventHandler> event_handler,
-        std::shared_ptr<CQNetServer> server)
+    Ptr static Create(int index, std::shared_ptr<ICodec> codec, std::shared_ptr<IEventHandler> event_handler)
     {
         class make_shared_enabler : public EventLoop
         {
         public:
-            make_shared_enabler(int index, std::shared_ptr<ICodec> codec, std::shared_ptr<IEventHandler> event_handler,
-                std::shared_ptr<CQNetServer> server)
-                : EventLoop(index, std::move(codec), std::move(event_handler), std::move(server))
+            make_shared_enabler(int index, std::shared_ptr<ICodec> codec, std::shared_ptr<IEventHandler> event_handler)
+                : EventLoop(index, std::move(codec), std::move(event_handler))
             {
             }
         };
 
-        return std::make_shared<make_shared_enabler>(
-            index, std::move(codec), std::move(event_handler), std::move(server));
+        return std::make_shared<make_shared_enabler>(index, std::move(codec), std::move(event_handler));
     }
 
     void Run()
     {
         auto function = std::bind(&EventLoop::HandleEvent, this, std::placeholders::_1, std::placeholders::_2);
         kqueue_->Polling(std::move(function));
+    }
+
+    void SetTcpListener(TcpListenSocket::Ptr ptr_)
+    {
+        tcp_listener_ = std::move(ptr_);
     }
 
     // TODO: del this later
@@ -108,9 +108,9 @@ private:
     bool AcceptConn(int fd)
     {
         // 判断是否为 listen socket 发送了事件
-        if (svr_->GetFD() == fd)
+        if (tcp_listener_->GetFD() == fd)
         {
-            int new_conn_fd = svr_->Read(nullptr, 0);
+            int new_conn_fd = tcp_listener_->Accept();
             if (new_conn_fd == CQNET_INVALID_SOCKET)
             {
                 //TODO: error handle
