@@ -12,10 +12,11 @@ class CQNetServer
 {
 private:
     base::WaitGroup::Ptr wg_;
-    std::shared_ptr<IEventHandler> event_handler_;
-    std::shared_ptr<ILoadBalance> lb_;
+    TcpListener::Ptr tcp_listener_;
+    // some common interface
     std::shared_ptr<ICodec> codec_;
-    TcpListenSocket::Ptr tcp_listener_;
+    std::shared_ptr<ILoadBalance> lb_;
+    std::shared_ptr<IEventHandler> event_handler_;
 
 public:
     CQNetServer()
@@ -59,20 +60,7 @@ public:
 
     void SetTcpServer(bool is_IPV6, const char* ip, int port, int back_num = 512)
     {
-        tcp_listener_ = std::move(TcpListenSocket::Create(is_IPV6, ip, port, back_num));
-    }
-
-    void SetThreadNum(int num)
-    {
-        for (int i = 0; i < num; i++)
-        {
-            auto el = EventLoop::Create(i, codec_, event_handler_);
-            if (i == 0)
-            {
-                el->GetKQueue()->AddRead(tcp_listener_->GetFD());
-            }
-            lb_->Register(std::move(el));
-        }
+        tcp_listener_ = std::move(TcpListener::Create(nullptr, is_IPV6, ip, port, back_num));
     }
 };
 

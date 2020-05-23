@@ -5,11 +5,15 @@
 #include "base/Buffer.hpp"
 #include "netpoll/NetPoll.hpp"
 #include "NetAddr.hpp"
+#include "Interface.hpp"
 #include "NetSocket.hpp"
 
 namespace cqnet {
 
-class NetConn : public ConnSocket
+class NetConn
+    : public Socket
+    , public ConnSocket
+    , public INetConn
 {
 public:
     using Ptr = std::shared_ptr<NetConn>;
@@ -20,8 +24,6 @@ private:
     bool opened_; // connection opened event fired
     int recv_size;
     char recv_buffer_[1024];
-    EncodeFunc encode_func_;
-    DecodeFunc decode_func_;
     NetAddr::Ptr local_addr_;          // local addr
     NetAddr::Ptr remote_addr_;         // remote addr
     netpoll::KQueue::Ptr kqueue_;      // connected event-loop
@@ -29,12 +31,10 @@ private:
     base::CharBuffer outbound_buffer_; // store data to send
 
 protected:
-    NetConn(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
+    NetConn(int fd, netpoll::KQueue::Ptr kqueue)
         : ConnSocket(fd, true)
         , opened_(false)
         , recv_size(0)
-        , encode_func_(std::move(encode_func))
-        , decode_func_(std::move(decode_func))
         , kqueue_(std::move(kqueue))
         , inbound_buffer_(base::CharBuffer())
         , outbound_buffer_(base::CharBuffer(0))
@@ -47,51 +47,60 @@ protected:
 public:
     // 在 event loop 中， 每次 accept 到一个 fd，就调用这个方法创建一个 connection
     // 然后将 read 事件注册到 epoll 中， 每次有read 事件，就调用这个 connection 的
-    Ptr static Create(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
+    Ptr static Create(int fd, netpoll::KQueue::Ptr kqueue)
     {
         class make_shared_enabler : public NetConn
         {
         public:
-            make_shared_enabler(int fd, netpoll::KQueue::Ptr kqueue, EncodeFunc encode_func, DecodeFunc decode_func)
-                : NetConn(fd, std::move(kqueue), std::move(encode_func), std::move(decode_func))
+            make_shared_enabler(int fd, netpoll::KQueue::Ptr kqueue)
+                : NetConn(fd, std::move(kqueue))
             {
             }
         };
 
-        return std::make_shared<make_shared_enabler>(
-            fd, std::move(kqueue), std::move(encode_func), std::move(decode_func));
-    }
-
-    // this is used for Codec
-    // 从 buffer 中读取数据出来撒
-    std::tuple<char*, size_t> ReadBuffer()
-    {
-        return inbound_buffer_.get_read_ptr_with_readable_count();
+        return std::make_shared<make_shared_enabler>(fd, std::move(kqueue));
     }
 
     // 从socket中读取数据
     // 只有当 event loop 从 epoll 中得到当前的 connection 有可读事件的时候，然后在 epoll 中调用这个方法
     // 将 socket 中的数据读取出来
-    void RecvFromSocket()
+    bool Read() override
     {
         do
         {
-            recv_size = base::SocketRecv(GetFD(), recv_buffer_, 1024);
+            recv_size = ReadFromSocket(recv_buffer_, 1024);
             inbound_buffer_.write(recv_buffer_, recv_size);
-        } while (recv_size < 1024);
+        } while (recv_size == 1024);
+
+        return true;
     }
 
-    bool ShiftN(size_t size)
+    bool Write() override
+    {
+        std::cout << "写数据了啊" << std::endl;
+        return true;
+    }
+
+    // this is used for Cod ec
+    // 从 buffer 中读取数据出来撒
+    std::tuple<char*, size_t> ReadBuffer() override
+    {
+        return inbound_buffer_.get_read_ptr_with_readable_count();
+    }
+
+    bool ShiftN(size_t size) override
     {
         return inbound_buffer_.shift_n(size);
     }
 
-    void ResetBuffer()
+    void ResetBuffer() override
     {
         inbound_buffer_.reset();
     }
 
-    bool AsyncWrite(char* data, size_t size)
+    // this is to called in logic func
+    // to send message async
+    bool AsyncWrite(char* data, size_t size) override
     {
         // TODO: call encode function , this is a problem
 
@@ -104,7 +113,7 @@ public:
         }
 
         /*  send error if transnum < 0  */
-        int send_size = Write(data, size);
+        int send_size = WriteToSocket(data, size);
         if (send_size < 0)
         {
             // TODO: close connection
@@ -121,7 +130,7 @@ public:
         return true;
     }
 
-    bool Wakeup()
+    bool Wakeup() override
     {
         auto kqueue = this->kqueue_;
 
@@ -148,21 +157,18 @@ public:
         return outbound_buffer_.is_empty();
     }
 
-    NetAddr::Ptr LocalAddr()
+    NetAddr::Ptr LocalAddr() override
     {
         return local_addr_;
     }
 
-    NetAddr::Ptr RemoteAddr()
+    NetAddr::Ptr RemoteAddr() override
     {
         return remote_addr_;
     }
 
-    void Context() {}
-    void SetContext() {}
-
-private:
-    void open(char* buf) {}
+    void Context() override {}
+    void SetContext() override {}
 };
 
 } // namespace cqnet

@@ -6,21 +6,20 @@
 #include "Interface.hpp"
 #include "NetConn.hpp"
 #include "NetListener.hpp"
+#include "NetSocket.hpp"
 
 namespace cqnet {
 
 class EventLoop
-    : public base::NonCopyable
+    : public IEventLoop
+    , public base::NonCopyable
     , public std::enable_shared_from_this<EventLoop>
 {
 private:
-    int index_; // event loop index
-    NetConn::EncodeFunc encode_func_;
-    NetConn::DecodeFunc decode_func_;
-    std::unordered_map<int, NetConn::Ptr> connections_;
-    TcpListenSocket::Ptr tcp_listener_;
+    int index_;
     netpoll::KQueue::Ptr kqueue_;     // epoll or kqueue
     std::atomic<int32_t> conn_count_; // number of active connections in event-loop
+    std::unordered_map<int, NetConn::Ptr> connections_;
     // some interface for user-defined logic
     std::shared_ptr<ICodec> codec_;
     std::shared_ptr<IEventHandler> event_handler_;
@@ -30,14 +29,7 @@ protected:
         : index_(index)
         , codec_(codec)
         , event_handler_(event_handler)
-        , kqueue_(netpoll::KQueue::Create())
-    {
-        auto encode_func = [codec](NetConn::Ptr conn, char* buf) { return codec->Encode(conn, buf); };
-        auto decode_func = [codec](NetConn::Ptr conn) { return codec->Decode(conn); };
-
-        encode_func_ = std::forward<NetConn::EncodeFunc>(encode_func);
-        decode_func_ = std::forward<NetConn::DecodeFunc>(decode_func);
-    };
+        , kqueue_(netpoll::KQueue::Create()){};
 
     ~EventLoop() {}
 
@@ -60,13 +52,9 @@ public:
 
     void Run()
     {
-        auto function = std::bind(&EventLoop::HandleEvent, this, std::placeholders::_1, std::placeholders::_2);
-        kqueue_->Polling(std::move(function));
-    }
-
-    void SetTcpListener(TcpListenSocket::Ptr ptr_)
-    {
-        tcp_listener_ = std::move(ptr_);
+        auto func = std::bind(
+            &EventLoop::HandleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+        kqueue_->Polling(std::move(func));
     }
 
     // TODO: del this later
@@ -75,64 +63,64 @@ public:
         return kqueue_;
     }
 
-private:
-    // HandleEvent defines the handler to net event
-    bool HandleEvent(int fd, int16_t filter)
+    // add a new tcp connection to event loop
+    void AddNewConn(int new_conn_fd) override
     {
-        auto iter = connections_.find(fd);
-        if (iter != connections_.end())
+        auto conn = NetConn::Create(new_conn_fd, this->kqueue_);
+        conn->SetNonblock();
+
+        if (kqueue_->AddRead(new_conn_fd, (void*)conn.get()))
         {
-            std::shared_ptr<NetConn> conn = iter->second;
-
-            if (!conn->IsOutBufferEmpty())
-            {
-                if (filter == EVFILT_WRITE)
-                {
-                    return WriteConn(std::move(conn));
-                }
-            }
-            else
-            {
-                if (filter == EVFILT_READ)
-                {
-                    return ReadConn(std::move(conn));
-                }
-            }
-            return true;
+            // add the connection to the connection map
+            connections_.insert(std::pair<int, NetConn::Ptr>(new_conn_fd, conn));
+            PlusConnCount();
         }
-
-        return AcceptConn(fd);
     }
 
-    // accept a new tcp connection
-    bool AcceptConn(int fd)
+    void AddTcpListener(TcpListener::Ptr l)
     {
-        // 判断是否为 listen socket 发送了事件
-        if (tcp_listener_->GetFD() == fd)
+        kqueue_->AddRead(l->GetFD(), (void*)l.get());
+    }
+
+private:
+    // HandleEvent defines the handler to net event
+    bool HandleEvent(int fd, int16_t filter, Socket* socket)
+    {
+        if (filter == EVFILT_WRITE)
         {
-            int new_conn_fd = tcp_listener_->Accept();
-            if (new_conn_fd == CQNET_INVALID_SOCKET)
+            std::cout << "WRITE 事件, fd = " << fd << std::endl;
+            return socket->Write();
+        }
+        else if (filter == EVFILT_READ)
+        {
+            std::cout << "READ 事件, fd = " << fd << std::endl;
+            // read socket
+            socket->Read();
+            auto iter = connections_.find(fd);
+            if (iter != connections_.end())
             {
-                //TODO: error handle
-            }
-
-            auto conn = NetConn::Create(new_conn_fd, this->kqueue_, encode_func_, decode_func_);
-            conn->SetNonblock();
-
-            if (kqueue_->AddRead(new_conn_fd))
-            {
-                connections_.insert(std::pair<int, NetConn::Ptr>(new_conn_fd, conn));
-                PlusConnCount();
-                return true;
-            }
-
-            if (!OpenConn(conn))
-            {
-                // TODO: error handle
+                auto conn_ptr = iter->second;
+                codec_->Decode(conn_ptr);
+                //                do
+                //                {
+                //                    // TODO : use codec to get a package
+                //                    // TODO: use event_handler
+                //                    break;
+                //                } while (true);
             }
         }
+        else
+        {
+            auto iter = connections_.find(fd);
+            if (iter == connections_.end())
+            {
+                return false;
+            }
+            auto conn_ptr = iter->second;
+            CloseConn(conn_ptr);
+        }
 
-        return false;
+        return true;
     }
 
     bool OpenConn(NetConn::Ptr conn)

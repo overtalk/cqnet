@@ -3,6 +3,8 @@
 #include "base/Platform.hpp"
 #include "base/AsyncJobQueue.hpp"
 #include "base/NonCopyable.hpp"
+#include "NetSocket.hpp"
+#include "Interface.hpp"
 
 namespace cqnet {
 namespace netpoll {
@@ -43,7 +45,7 @@ protected:
     ~KQueue() {}
 
 public:
-    using Callback = std::function<bool(int, int16_t)>;
+    using Callback = std::function<bool(int, int16_t, cqnet::Socket*)>;
     using Ptr = std::shared_ptr<KQueue>;
 
     Ptr static Create()
@@ -93,15 +95,17 @@ public:
                 int fd = event.ident;
                 int16_t ev_filter = kq_events_[i].filter;
                 uint16_t ev_flags = kq_events_[i].flags;
+                auto socket = (cqnet::Socket*)kq_events_[i].udata;
 
                 if (fd != user_event_ident_)
                 {
                     if (((ev_flags & EV_EOF) != 0) || ((ev_flags & EV_ERROR) != 0))
                     {
+                        std::cout << "EV_EOF / EV_ERROR" << std::endl;
                         ev_filter = event_filter_sock_;
                     }
 
-                    if (!cb(fd, ev_filter))
+                    if (!cb(fd, ev_filter, socket))
                     {
                         return false;
                     }
@@ -130,10 +134,10 @@ public:
     }
 
     // add kevent
-    bool AddRead(const int& fd)
+    bool AddRead(const int& fd, void* meta)
     {
         struct kevent evSet;
-        EV_SET(&evSet, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+        EV_SET(&evSet, fd, EVFILT_READ, EV_ADD, 0, 0, meta);
         return kevent(kq_fd_, &evSet, 1, nullptr, 0, nullptr) == 0;
     }
 

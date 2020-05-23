@@ -19,13 +19,13 @@ public:
         std::cout << "OnShutdown" << std::endl;
     }
 
-    std::tuple<char*, Action> OnOpened(std::shared_ptr<NetConn> conn) override
+    std::tuple<char*, Action> OnOpened(std::shared_ptr<INetConn> conn) override
     {
         std::cout << "OnOpened" << std::endl;
         return std::make_pair<char*, Action>(nullptr, Action::None);
     }
 
-    Action OnClosed(std::shared_ptr<NetConn> conn) override
+    Action OnClosed(std::shared_ptr<INetConn> conn) override
     {
         std::cout << "OnClosed" << std::endl;
         return Action::None;

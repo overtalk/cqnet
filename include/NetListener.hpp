@@ -1,57 +1,67 @@
 #pragma once
 
 #include "NetSocket.hpp"
+#include "Interface.hpp"
 
 namespace cqnet {
 
 // tcp listener
-class TcpListenSocket : public FD
+class TcpListener
+    : public Socket
+    , public TcpListenSocket
 {
+private:
+    // if get a new connection
+    // use this to allocate the new connection
+    std::shared_ptr<ILoadBalance> lb_;
+
 protected:
-    TcpListenSocket(int fd)
-        : FD(fd)
+    TcpListener(int fd, std::shared_ptr<ILoadBalance> lb)
+        : TcpListenSocket(fd)
+        , lb_(lb)
     {
     }
 
-    ~TcpListenSocket() {}
+    ~TcpListener() {}
 
 public:
-    using Ptr = std::shared_ptr<TcpListenSocket>;
+    using Ptr = std::shared_ptr<TcpListener>;
 
-    Ptr static Create(bool is_IPV6, const char* ip, int port, int back_num)
+    Ptr static Create(std::shared_ptr<ILoadBalance> lb, bool is_IPV6, const char* ip, int port, int back_num = 512)
     {
-        class make_shared_enabler : public TcpListenSocket
+        class make_shared_enabler : public TcpListener
         {
         public:
-            make_shared_enabler(int fd)
-                : TcpListenSocket(fd)
+            make_shared_enabler(int fd, std::shared_ptr<ILoadBalance> lb)
+                : TcpListener(fd, std::move(lb))
             {
             }
         };
 
         int local_fd = cqnet::base::SocketTcpListen(is_IPV6, ip, port, back_num);
-
-        return std::make_shared<make_shared_enabler>(local_fd);
+        return std::make_shared<make_shared_enabler>(local_fd, std::move(lb));
     }
 
     // Read means accept a connection for tcp listener
-    int Accept()
+    // Accept is a better function name, but for common usage. call it read
+    bool Read() override
     {
-        const auto conn_fd = base::SocketAccept(GetFD(), nullptr, nullptr);
-        if (conn_fd == CQNET_INVALID_SOCKET)
+        std::cout << " tcp read " << std::endl;
+        int new_conn_fd = AcceptTcpConn();
+        std::cout << " 新连接的fd = " << new_conn_fd << std::endl;
+        if (new_conn_fd == CQNET_INVALID_SOCKET)
         {
-            // TODO: handle error
-            // if (EINTR == BRYNET_ERRNO)
-            // {
-            //     throw EintrError();
-            // }
-            // else
-            // {
-            //     throw AcceptError(BRYNET_ERRNO);
-            // }
+            return false;
         }
 
-        return conn_fd;
+        std::shared_ptr<IEventLoop> el = lb_->Next();
+        el->AddNewConn(new_conn_fd);
+        return true;
+    }
+
+    bool Write() override
+    {
+        return false;
     }
 };
 

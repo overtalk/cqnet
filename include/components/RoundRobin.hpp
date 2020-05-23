@@ -10,10 +10,10 @@ class RoundRobinLoadBalance : public ILoadBalance
 private:
     size_t size_;
     size_t next_loop_index_;
-    std::vector<std::shared_ptr<EventLoop>> event_loops;
+    std::vector<std::shared_ptr<IEventLoop>> event_loops;
 
 public:
-    void Register(std::shared_ptr<EventLoop> el) override
+    void Register(std::shared_ptr<IEventLoop> el) override
     {
         event_loops.push_back(std::move(el));
         size_++;
@@ -24,7 +24,7 @@ public:
         return size_;
     }
 
-    std::shared_ptr<EventLoop> Next() override
+    std::shared_ptr<IEventLoop> Next() override
     {
         auto el = event_loops[next_loop_index_++];
         if (next_loop_index_ >= size_)

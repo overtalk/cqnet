@@ -7,6 +7,7 @@
 namespace cqnet {
 
 class ConnSocket;
+class TcpListenSocket;
 
 // FD defines the file desc
 class FD : public base::NonCopyable
@@ -31,6 +32,7 @@ public:
     }
 
     friend ConnSocket;
+    friend TcpListenSocket;
 };
 
 // tcp listener
@@ -59,11 +61,6 @@ public:
         return base::SocketNonblock(fd_);
     }
 
-    void SetNoDelay()
-    {
-        base::SocketNodelay(fd_);
-    }
-
     void SetSendSize(int s_size)
     {
         base::SocketSetSendSize(fd_, s_size);
@@ -74,15 +71,51 @@ public:
         base::SocketSetRecvSize(fd_, r_size);
     }
 
-    int Write(char* send_ptr, int try_send)
+    int WriteToSocket(char* send_ptr, int try_send)
     {
         return base::SocketSend(fd_, send_ptr, try_send);
     }
 
-    int Read(char* recv_ptr, int try_recv)
+    int ReadFromSocket(char* recv_ptr, int try_recv)
     {
         return base::SocketRecv(fd_, recv_ptr, try_recv);
     }
 };
 
+class TcpListenSocket : public FD
+{
+public:
+    TcpListenSocket(int fd)
+        : FD(fd)
+    {
+    }
+
+    ~TcpListenSocket() {}
+
+    void SetNoDelay()
+    {
+        base::SocketNodelay(fd_);
+    }
+
+    int AcceptTcpConn()
+    {
+        const auto conn_fd = base::SocketAccept(fd_, nullptr, nullptr);
+        if (conn_fd == CQNET_INVALID_SOCKET)
+        {
+            std::cout << "failed to get new connection" << std::endl;
+            return -1;
+            // TODO: handle error
+            // if (EINTR == BRYNET_ERRNO)
+            // {
+            //     throw EintrError();
+            // }
+            // else
+            // {
+            //     throw AcceptError(BRYNET_ERRNO);
+            // }
+        }
+
+        return conn_fd;
+    }
+};
 } // namespace cqnet
