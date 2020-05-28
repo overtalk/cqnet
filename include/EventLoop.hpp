@@ -57,12 +57,6 @@ public:
         kqueue_->Polling(std::move(func));
     }
 
-    // TODO: del this later
-    netpoll::KQueue::Ptr GetKQueue()
-    {
-        return kqueue_;
-    }
-
     // add a new tcp connection to event loop
     void AddNewConn(int new_conn_fd) override
     {
@@ -75,6 +69,9 @@ public:
             connections_.insert(std::pair<int, NetConn::Ptr>(new_conn_fd, conn));
             PlusConnCount();
         }
+
+        // TODO: handler the open event
+        event_handler_->OnOpened(conn);
     }
 
     void AddTcpListener(TcpListener::Ptr l)
@@ -99,14 +96,7 @@ private:
             auto iter = connections_.find(fd);
             if (iter != connections_.end())
             {
-                auto conn_ptr = iter->second;
-                codec_->Decode(conn_ptr);
-                //                do
-                //                {
-                //                    // TODO : use codec to get a package
-                //                    // TODO: use event_handler
-                //                    break;
-                //                } while (true);
+                event_handler_->React(codec_->Decode(iter->second));
             }
         }
         else
@@ -120,30 +110,6 @@ private:
             CloseConn(conn_ptr);
         }
 
-        return true;
-    }
-
-    bool OpenConn(NetConn::Ptr conn)
-    {
-        // TODO: set conn address
-        auto tup = event_handler_->OnOpened(conn);
-
-        // TODO: handle all those things
-        auto data = std::get<0>(tup);
-        auto action = std::get<1>(tup);
-
-        return true;
-    }
-
-    bool ReadConn(NetConn::Ptr conn)
-    {
-        std::cout << "ReadConn" << std::endl;
-        return true;
-    }
-
-    bool WriteConn(NetConn::Ptr conn)
-    {
-        std::cout << "WriteConn" << std::endl;
         return true;
     }
 

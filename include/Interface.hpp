@@ -2,6 +2,7 @@
 
 #include "base/Platform.hpp"
 #include "base/Buffer.hpp"
+#include "base/SDS.hpp"
 #include "NetAddr.hpp"
 
 namespace cqnet {
@@ -44,7 +45,7 @@ public:
     virtual std::tuple<char*, Action> OnOpened(std::shared_ptr<INetConn> conn) = 0;
     virtual Action OnClosed(std::shared_ptr<INetConn> conn) = 0;
     virtual void PreWrite() = 0;
-    virtual void React() = 0;
+    virtual void React(base::SDS::Ptr sds) = 0;
     virtual void Tick() = 0;
     // virtual Broadcast() = 0;
 };
@@ -63,7 +64,7 @@ class ICodec
 {
 public:
     virtual char* Encode(std::shared_ptr<INetConn> conn, char* buf) = 0;
-    virtual char* Decode(std::shared_ptr<INetConn> conn) = 0;
+    virtual base::SDS::Ptr Decode(std::shared_ptr<INetConn> conn) = 0;
 };
 
 // Socket defines the thing to store into epoll/kqueue

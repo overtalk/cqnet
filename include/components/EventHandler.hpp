@@ -36,9 +36,11 @@ public:
         std::cout << "PreWrite" << std::endl;
     }
 
-    void React() override
+    void React(base::SDS::Ptr sds) override
     {
-        std::cout << "React" << std::endl;
+        char* data = sds->GetData();
+        int size = sds->GetSize();
+        std::cout << "In React Func :" << size << " " << data << std::endl;
     }
 
     void Tick() override
