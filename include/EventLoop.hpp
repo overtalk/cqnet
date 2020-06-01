@@ -17,7 +17,7 @@ class EventLoop
 {
 private:
     int index_;
-    netpoll::KQueue::Ptr kqueue_;
+    netpoll::Poller::Ptr poller_;
     std::atomic<int32_t> conn_count_;
     std::unordered_map<int, NetConn*> connections_;
     cqnet::TcpListener::Ptr tcp_listener_{nullptr};
@@ -31,7 +31,7 @@ protected:
         , codec_(std::move(codec))
         , conn_count_(0)
         , event_handler_(std::move(event_handler))
-        , kqueue_(netpoll::KQueue::Create()){};
+        , poller_(netpoll::Poller::Create()){};
 
     ~EventLoop() = default;
 
@@ -56,16 +56,16 @@ public:
     {
         auto func = std::bind(
             &EventLoop::HandleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-        kqueue_->Polling(std::move(func));
+        poller_->Polling(std::move(func));
     }
 
     // add a new tcp connection to event loop
     void AddNewConn(int new_conn_fd) override
     {
-        auto conn = new NetConn(new_conn_fd, this->codec_, this->kqueue_);
+        auto conn = new NetConn(new_conn_fd, this->codec_, this->poller_);
         conn->SetNonblock();
 
-        if (kqueue_->AddRead(new_conn_fd, (void*)conn))
+        if (poller_->AddRead(new_conn_fd, (void*)conn))
         {
             // add the connection to the connection map
             connections_.insert(std::pair<int, NetConn*>(new_conn_fd, conn));
@@ -79,7 +79,7 @@ public:
     bool AddTcpListener(std::shared_ptr<ILoadBalance> lb, bool is_IPV6, const char* ip, int port, int back_num) override
     {
         tcp_listener_ = cqnet::TcpListener::Create(std::move(lb), is_IPV6, ip, port, back_num);
-        return kqueue_->AddRead(tcp_listener_->GetFD(), (void*)tcp_listener_.get());
+        return poller_->AddRead(tcp_listener_->GetFD(), (void*)tcp_listener_.get());
     }
 
 private:
@@ -141,7 +141,7 @@ private:
         }
 
         int fd = conn->GetFD();
-        kqueue_->Delete(fd);
+        poller_->Delete(fd);
         conn->Close();
 
         // delete from the map

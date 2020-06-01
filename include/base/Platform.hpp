@@ -33,6 +33,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef CQNET_PLATFORM_LINUX
+#include <sys/epoll.h>
+#endif
+
 #ifdef CQNET_PLATFORM_WINDOWS
 #define CQNET_SOCKET_ERROR SOCKET_ERROR
 #define CQNET_INVALID_SOCKET INVALID_SOCKET

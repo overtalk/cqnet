@@ -25,17 +25,17 @@ private:
     char recv_buffer_[1024];
     NetAddr::Ptr local_addr_;     // local addr
     NetAddr::Ptr remote_addr_;    // remote addr
-    netpoll::KQueue::Ptr kqueue_; // connected event-loop
+    netpoll::Poller::Ptr poller_; // connected event-loop
     std::shared_ptr<ICodec> codec_;
     base::CharBuffer inbound_buffer_;  // store data to read
     base::CharBuffer outbound_buffer_; // store data to send
 
 public:
-    NetConn(int fd, std::shared_ptr<ICodec> codec, netpoll::KQueue::Ptr kqueue)
+    NetConn(int fd, std::shared_ptr<ICodec> codec, netpoll::Poller::Ptr poller)
         : ConnSocket(fd, true)
         , opened_(false)
         , recv_size(0)
-        , kqueue_(std::move(kqueue))
+        , poller_(std::move(poller))
         , codec_(std::move(codec))
         , inbound_buffer_(base::CharBuffer())
         , outbound_buffer_(base::CharBuffer(0))
@@ -96,7 +96,7 @@ public:
                 return true;
             }
         }
-        kqueue_->DelWrite(GetFD());
+        poller_->DelWrite(GetFD());
 
         return true;
     }
@@ -147,23 +147,23 @@ public:
         if (send_size < size)
         {
             outbound_buffer_.write(data + send_size, size - send_size);
-            kqueue_->AddWrite(GetFD());
+            poller_->AddWrite(GetFD());
         }
         return true;
     }
 
     bool Wakeup() override
     {
-        auto kqueue = this->kqueue_;
+        auto poller = this->poller_;
 
-        auto cb = [kqueue]() {
+        auto cb = [poller]() {
             // TODO: modify the function
             auto c = [] { return false; };
-            kqueue->Trigger(c);
+            poller->Trigger(c);
             return false;
         };
 
-        return kqueue_->Trigger(cb);
+        return poller_->Trigger(cb);
     }
 
     bool Close()

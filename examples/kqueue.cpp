@@ -9,9 +9,6 @@
 #include <errno.h>
 #include <iostream>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-
 int main(int argc, const char* argv[])
 {
     // Macos automatically binds both ipv4 and 6 when you do this.

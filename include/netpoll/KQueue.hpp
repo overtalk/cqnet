@@ -9,7 +9,7 @@
 namespace cqnet {
 namespace netpoll {
 
-class KQueue : public base::NonCopyable
+class Poller : public base::NonCopyable
 {
 public:
     // EVFilterSock represents exceptional events that are not read/write, like socket being closed,
@@ -27,7 +27,7 @@ private:
     base::AsyncJobQueue async_job_queue_; // async job queue
 
 protected:
-    KQueue()
+    Poller()
     {
         kq_fd_ = kqueue();
         if (kq_fd_ == -1)
@@ -42,19 +42,19 @@ protected:
         }
     }
 
-    ~KQueue() {}
+    ~Poller() {}
 
 public:
     using Callback = std::function<bool(int, int16_t, cqnet::Socket*)>;
-    using Ptr = std::shared_ptr<KQueue>;
+    using Ptr = std::shared_ptr<Poller>;
 
     Ptr static Create()
     {
-        class make_shared_enabler : public KQueue
+        class make_shared_enabler : public Poller
         {
         public:
             make_shared_enabler()
-                : KQueue()
+                : Poller()
             {
             }
         };
@@ -205,10 +205,10 @@ private:
     }
 };
 
-const int KQueue::user_event_ident_ = 0;
-const int KQueue::init_event_list_size_ = 64;
-const int KQueue::event_list_resize_increment_ = 128;
-const int KQueue::event_filter_sock_ = -0xd;
+const int Poller::user_event_ident_ = 0;
+const int Poller::init_event_list_size_ = 64;
+const int Poller::event_list_resize_increment_ = 128;
+const int Poller::event_filter_sock_ = -0xd;
 
 } // namespace netpoll
 } // namespace cqnet
