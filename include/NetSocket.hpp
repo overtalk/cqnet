@@ -16,7 +16,7 @@ private:
     int fd_;
 
 public:
-    FD(int fd)
+    explicit FD(int fd)
         : fd_(fd)
     {
     }
@@ -26,7 +26,7 @@ public:
         base::SocketClose(fd_);
     }
 
-    int GetFD()
+    int GetFD() const
     {
         return fd_;
     }
@@ -49,9 +49,9 @@ public:
     {
     }
 
-    ~ConnSocket() {}
+    ~ConnSocket() = default;
 
-    bool IsServerSide()
+    bool IsServerSide() const
     {
         return server_side_;
     }
@@ -85,12 +85,12 @@ public:
 class TcpListenSocket : public FD
 {
 public:
-    TcpListenSocket(int fd)
+    explicit TcpListenSocket(int fd)
         : FD(fd)
     {
     }
 
-    ~TcpListenSocket() {}
+    ~TcpListenSocket() = default;
 
     void SetNoDelay()
     {

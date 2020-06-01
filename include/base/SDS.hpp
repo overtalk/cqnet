@@ -22,7 +22,7 @@ protected:
 
     ~SDS()
     {
-        std::cout << "SDS destory!" << std::endl;
+        std::cout << "SDS destroy!" << std::endl;
         delete[] data;
     }
 
@@ -48,7 +48,7 @@ public:
         return data;
     }
 
-    int GetSize()
+    int GetSize() const
     {
         return size;
     }

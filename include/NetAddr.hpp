@@ -23,8 +23,8 @@ public:
     }
 
 protected:
-    NetAddr();
-    ~NetAddr();
+    NetAddr() = default;
+    ~NetAddr() = default;
 };
 
 } // namespace cqnet

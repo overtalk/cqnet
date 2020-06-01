@@ -19,6 +19,7 @@
 #include <functional>
 #include <condition_variable>
 #include <cstring>
+#include <thread>
 
 // macos plarform
 #ifdef CQNET_PLATFORM_DARWIN

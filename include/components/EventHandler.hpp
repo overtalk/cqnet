@@ -19,13 +19,14 @@ public:
         std::cout << "OnShutdown" << std::endl;
     }
 
-    std::tuple<char*, Action> OnOpened(std::shared_ptr<INetConn> conn) override
+    IEventHandler::Ret OnOpened(INetConn* conn) override
     {
-        std::cout << "OnOpened" << std::endl;
-        return std::make_pair<char*, Action>(nullptr, Action::None);
+        std::cout << "OnOpenedSDS" << std::endl;
+        auto temp = "qqq";
+        return std::make_pair<base::SDS::Ptr, Action>(base::SDS::Create(temp, strlen(temp)), Action::None);
     }
 
-    Action OnClosed(std::shared_ptr<INetConn> conn) override
+    Action OnClosed(INetConn* conn) override
     {
         std::cout << "OnClosed" << std::endl;
         return Action::None;
@@ -36,16 +37,22 @@ public:
         std::cout << "PreWrite" << std::endl;
     }
 
-    void React(base::SDS::Ptr sds) override
+    IEventHandler::Ret React(base::SDS::Ptr sds) override
     {
         char* data = sds->GetData();
         int size = sds->GetSize();
-        std::cout << "In React Func :" << size << " " << data << std::endl;
+        std::cout << "In React Func :" << size << " " << data;
+        return std::make_pair<base::SDS::Ptr, Action>(base::SDS::Create(data, size), Action::None);
     }
 
     void Tick() override
     {
         std::cout << "Tick" << std::endl;
+    }
+
+    void Broadcast() override
+    {
+        std::cout << "Broadcast" << std::endl;
     }
 };
 

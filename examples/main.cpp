@@ -1,24 +1,22 @@
-#include <sys/un.h>
 #include <iostream>
-#include "base/SocketLib.hpp"
+#include <unistd.h>
 #include "netpoll/NetPoll.hpp"
 #include "components/Codec.hpp"
 #include "components/RoundRobin.hpp"
 #include "components/EventHandler.hpp"
-#include "EventLoop.hpp"
 #include "CQNetServer.hpp"
 
 int main(int argc, const char* argv[])
 {
-    auto el = cqnet::EventLoop::Create(1, std::make_shared<cqnet::Codec>(), std::make_shared<cqnet::EventHandler>());
-    auto lb = std::make_shared<cqnet::RoundRobinLoadBalance>();
-    lb->Register(el);
+    auto cqnet_server = cqnet::CQNetServer::Create(2, std::make_shared<cqnet::Codec>(),
+        std::make_shared<cqnet::RoundRobinLoadBalance>(), std::make_shared<cqnet::EventHandler>());
+    cqnet_server->AddTcp(false, "127.0.0.1", 9999);
+    cqnet_server->Run();
 
-    auto l = cqnet::TcpListener::Create(lb, false, "127.0.0.1", 9999);
-    std::cout << " yes " << std::endl;
-    el->AddTcpListener(l);
-
-    el->Run();
+    while (true)
+    {
+        usleep(1000);
+    }
 
     return 0;
 }

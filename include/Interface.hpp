@@ -15,6 +15,7 @@ enum class Action : uint8_t
 };
 
 class CQNetServer;
+class IEventLoop;
 
 class INetConn
 {
@@ -26,28 +27,8 @@ public:
     virtual std::tuple<char*, size_t> ReadBuffer() = 0;
     virtual bool ShiftN(size_t size) = 0;
     virtual void ResetBuffer() = 0;
-    virtual bool AsyncWrite(char* data, size_t size) = 0;
+    virtual bool AsyncWrite(base::SDS::Ptr sds) = 0;
     virtual bool Wakeup() = 0;
-};
-
-class IEventLoop
-{
-public:
-    virtual void AddNewConn(int fd) = 0;
-};
-
-// IEventHandler defines the event handler interface
-class IEventHandler
-{
-public:
-    virtual Action OnInitComplete(const CQNetServer* svr) = 0;
-    virtual void OnShutdown(CQNetServer* svr) = 0;
-    virtual std::tuple<char*, Action> OnOpened(std::shared_ptr<INetConn> conn) = 0;
-    virtual Action OnClosed(std::shared_ptr<INetConn> conn) = 0;
-    virtual void PreWrite() = 0;
-    virtual void React(base::SDS::Ptr sds) = 0;
-    virtual void Tick() = 0;
-    // virtual Broadcast() = 0;
 };
 
 class ILoadBalance
@@ -60,11 +41,36 @@ public:
     virtual std::shared_ptr<IEventLoop> Next() = 0;
 };
 
+class IEventLoop
+{
+public:
+    virtual void Run() = 0;
+    virtual void AddNewConn(int fd) = 0;
+    virtual bool AddTcpListener(
+        std::shared_ptr<ILoadBalance> lb, bool is_IPV6, const char* ip, int port, int back_num) = 0;
+};
+
+// IEventHandler defines the event handler interface
+class IEventHandler
+{
+public:
+    using Ret = std::tuple<base::SDS::Ptr, Action>;
+
+    virtual Action OnInitComplete(const CQNetServer* svr) = 0;
+    virtual void OnShutdown(CQNetServer* svr) = 0;
+    virtual Ret OnOpened(INetConn* conn) = 0;
+    virtual Action OnClosed(INetConn* conn) = 0;
+    virtual void PreWrite() = 0;
+    virtual Ret React(base::SDS::Ptr sds) = 0;
+    virtual void Tick() = 0;
+    virtual void Broadcast() = 0;
+};
+
 class ICodec
 {
 public:
-    virtual char* Encode(std::shared_ptr<INetConn> conn, char* buf) = 0;
-    virtual base::SDS::Ptr Decode(std::shared_ptr<INetConn> conn) = 0;
+    virtual base::SDS::Ptr Encode(INetConn* conn, base::SDS::Ptr sds) = 0;
+    virtual base::SDS::Ptr Decode(INetConn* conn) = 0;
 };
 
 // Socket defines the thing to store into epoll/kqueue

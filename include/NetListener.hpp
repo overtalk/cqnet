@@ -18,16 +18,16 @@ private:
 protected:
     TcpListener(int fd, std::shared_ptr<ILoadBalance> lb)
         : TcpListenSocket(fd)
-        , lb_(lb)
+        , lb_(std::move(lb))
     {
     }
 
-    ~TcpListener() {}
+    ~TcpListener() = default;
 
 public:
     using Ptr = std::shared_ptr<TcpListener>;
 
-    Ptr static Create(std::shared_ptr<ILoadBalance> lb, bool is_IPV6, const char* ip, int port, int back_num = 512)
+    Ptr static Create(std::shared_ptr<ILoadBalance> lb, bool is_IPV6, const char* ip, int port, int back_num)
     {
         class make_shared_enabler : public TcpListener
         {

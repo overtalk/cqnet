@@ -14,52 +14,53 @@ class NetConn
     : public Socket
     , public ConnSocket
     , public INetConn
+    , std::enable_shared_from_this<INetConn>
 {
-public:
-    using Ptr = std::shared_ptr<NetConn>;
-    using EncodeFunc = std::function<char*(std::shared_ptr<NetConn>, char*)>;
-    using DecodeFunc = std::function<char*(std::shared_ptr<NetConn>)>;
+    //public:
+    //    using Ptr = std::shared_ptr<NetConn>;
 
 private:
     bool opened_; // connection opened event fired
     int recv_size;
     char recv_buffer_[1024];
-    NetAddr::Ptr local_addr_;          // local addr
-    NetAddr::Ptr remote_addr_;         // remote addr
-    netpoll::KQueue::Ptr kqueue_;      // connected event-loop
+    NetAddr::Ptr local_addr_;     // local addr
+    NetAddr::Ptr remote_addr_;    // remote addr
+    netpoll::KQueue::Ptr kqueue_; // connected event-loop
+    std::shared_ptr<ICodec> codec_;
     base::CharBuffer inbound_buffer_;  // store data to read
     base::CharBuffer outbound_buffer_; // store data to send
 
-protected:
-    NetConn(int fd, netpoll::KQueue::Ptr kqueue)
+public:
+    NetConn(int fd, std::shared_ptr<ICodec> codec, netpoll::KQueue::Ptr kqueue)
         : ConnSocket(fd, true)
         , opened_(false)
         , recv_size(0)
         , kqueue_(std::move(kqueue))
+        , codec_(std::move(codec))
         , inbound_buffer_(base::CharBuffer())
         , outbound_buffer_(base::CharBuffer(0))
     {
         //TODO: net address
     }
 
-    ~NetConn() {}
+    ~NetConn() = default;
 
 public:
     // 在 event loop 中， 每次 accept 到一个 fd，就调用这个方法创建一个 connection
-    // 然后将 read 事件注册到 epoll 中， 每次有read 事件，就调用这个 connection 的
-    Ptr static Create(int fd, netpoll::KQueue::Ptr kqueue)
-    {
-        class make_shared_enabler : public NetConn
-        {
-        public:
-            make_shared_enabler(int fd, netpoll::KQueue::Ptr kqueue)
-                : NetConn(fd, std::move(kqueue))
-            {
-            }
-        };
-
-        return std::make_shared<make_shared_enabler>(fd, std::move(kqueue));
-    }
+    //    // 然后将 read 事件注册到 epoll 中， 每次有read 事件，就调用这个 connection 的
+    //    Ptr static Create(int fd, std::shared_ptr<ICodec> codec, netpoll::KQueue::Ptr kqueue)
+    //    {
+    //        class make_shared_enabler : public NetConn
+    //        {
+    //        public:
+    //            make_shared_enabler(int fd, std::shared_ptr<ICodec> codec, netpoll::KQueue::Ptr kqueue)
+    //                : NetConn(fd, std::move(codec), std::move(kqueue))
+    //            {
+    //            }
+    //        };
+    //
+    //        return std::make_shared<make_shared_enabler>(fd, std::move(codec), std::move(kqueue));
+    //    }
 
     // 从socket中读取数据
     // 只有当 event loop 从 epoll 中得到当前的 connection 有可读事件的时候，然后在 epoll 中调用这个方法
@@ -78,6 +79,25 @@ public:
     bool Write() override
     {
         std::cout << "写数据了啊" << std::endl;
+        auto data = outbound_buffer_.get_write_ptr_with_writable_count();
+        auto send_ptr = std::get<0>(data);
+        auto send_count = std::get<1>(data);
+        if (send_count > 0)
+        {
+            auto count = WriteToSocket(send_ptr, send_count);
+            if (count < 0)
+            {
+                // TODO: error handler
+                return false;
+            }
+            outbound_buffer_.shift_n(count);
+            if (count != send_count)
+            {
+                return true;
+            }
+        }
+        kqueue_->DelWrite(GetFD());
+
         return true;
     }
 
@@ -100,9 +120,11 @@ public:
 
     // this is to called in logic func
     // to send message async
-    bool AsyncWrite(char* data, size_t size) override
+    bool AsyncWrite(base::SDS::Ptr sds) override
     {
-        // TODO: call encode function , this is a problem
+        auto encoded_sdd = codec_->Encode(this, std::move(sds));
+        auto data = encoded_sdd->GetData();
+        auto size = encoded_sdd->GetSize();
 
         // 还有数据没有发送出去，排队发送
         // 当 outbound_buffer_ 不为空的时候，一定会增加这个connection fd 的可写事件的。所以可以放心的return
@@ -168,6 +190,7 @@ public:
     }
 
     void Context() override {}
+
     void SetContext() override {}
 };
 
