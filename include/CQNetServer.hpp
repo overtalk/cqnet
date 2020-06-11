@@ -75,7 +75,7 @@ public:
             return true;
         };
 
-        lb_->Iterate(tf);
+        lb_->Iterate(std::move(tf));
     }
 };
 

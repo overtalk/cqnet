@@ -1,5 +1,5 @@
-#include "base/Platform.hpp"
+#pragma once
 
 #ifdef CQNET_PLATFORM_DARWIN
-#include "netpoll/Kqueue.hpp"
+#include "netpoll/KQueue.hpp"
 #endif

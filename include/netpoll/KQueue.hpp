@@ -9,7 +9,9 @@
 namespace cqnet {
 namespace netpoll {
 
-class Poller : public base::NonCopyable
+class Poller
+    : public base::NonCopyable
+    , public INetPoll
 {
 public:
     // EVFilterSock represents exceptional events that are not read/write, like socket being closed,

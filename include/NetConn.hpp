@@ -23,15 +23,15 @@ private:
     bool opened_; // connection opened event fired
     int recv_size;
     char recv_buffer_[1024];
-    NetAddr::Ptr local_addr_;     // local addr
-    NetAddr::Ptr remote_addr_;    // remote addr
-    netpoll::Poller::Ptr poller_; // connected event-loop
+    NetAddr::Ptr local_addr_;          // local addr
+    NetAddr::Ptr remote_addr_;         // remote addr
+    std::shared_ptr<INetPoll> poller_; // connected event-loop
     std::shared_ptr<ICodec> codec_;
     base::CharBuffer inbound_buffer_;  // store data to read
     base::CharBuffer outbound_buffer_; // store data to send
 
 public:
-    NetConn(int fd, std::shared_ptr<ICodec> codec, netpoll::Poller::Ptr poller)
+    NetConn(int fd, std::shared_ptr<ICodec> codec, std::shared_ptr<INetPoll> poller)
         : ConnSocket(fd, true)
         , opened_(false)
         , recv_size(0)

@@ -17,7 +17,7 @@ class EventLoop
 {
 private:
     int index_;
-    netpoll::Poller::Ptr poller_;
+    std::shared_ptr<INetPoll> poller_;
     std::atomic<int32_t> conn_count_;
     std::unordered_map<int, NetConn*> connections_;
     cqnet::TcpListener::Ptr tcp_listener_{nullptr};

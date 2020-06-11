@@ -3,6 +3,7 @@
 #include "base/Platform.hpp"
 #include "base/Buffer.hpp"
 #include "base/SDS.hpp"
+#include "base/AsyncJobQueue.hpp"
 #include "NetAddr.hpp"
 
 namespace cqnet {
@@ -80,6 +81,22 @@ class Socket
 public:
     virtual bool Read() = 0;
     virtual bool Write() = 0;
+};
+
+class INetPoll
+{
+public:
+    using Callback = std::function<bool(int, int16_t, cqnet::Socket*)>;
+
+    virtual bool Close() = 0;
+    virtual bool Trigger(const base::AsyncJobQueue::AsyncJob& job) = 0;
+    virtual bool Polling(Callback cb) = 0;
+    virtual bool AddRead(const int& fd, void* meta) = 0;
+    virtual bool AddWrite(const int& fd) = 0;
+    virtual bool AddReadWrite(const int& fd, void* meta) = 0;
+    virtual bool DelRead(const int& fd) = 0;
+    virtual bool DelWrite(const int& fd) = 0;
+    virtual bool Delete(const int& fd) = 0;
 };
 
 } // namespace cqnet
